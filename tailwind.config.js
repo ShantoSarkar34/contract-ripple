@@ -9,23 +9,36 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
-        brand: "#2563eb",
-        "brand-600": "#1d4ed8",
-        "brand-50": "#eff6ff",
-        "brand-100": "#dbeafe",
-        "slate-100": "#f1f5f9",
-        "slate-200": "#e2e8f0",
-        "slate-700": "#334155",
+        // Primary brand
+        primary: "#2563eb",
+        "primary-hover": "#1d4ed8",
+        "primary-light": "#eff6ff",
+        // Secondary
+        secondary: "#64748b",
+        "secondary-hover": "#475569",
+        "secondary-light": "#f1f5f9",
+        // Slate neutrals
+        slate: {
+          50: "#f8fafc",
+          100: "#f1f5f9",
+          200: "#e2e8f0",
+          600: "#475569",
+          700: "#334155",
+          900: "#0f172a",
+        },
+        // Semantic
         success: "#16a34a",
-        danger: "#dc2626",
+        "success-light": "#dcfce7",
         warning: "#ca8a04",
+        "warning-light": "#fef3c7",
+        danger: "#dc2626",
+        "danger-light": "#fee2e2",
       },
       borderRadius: {
         sm: "0.375rem",
         md: "0.5rem",
         lg: "0.75rem",
+        xl: "1rem",
       },
       fontFamily: {
         sans: ["var(--font-geist-sans)", "Arial", "Helvetica", "sans-serif"],
