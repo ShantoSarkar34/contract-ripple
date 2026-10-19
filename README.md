@@ -5,8 +5,11 @@ potential impact on frontend integrations. It compares OpenAPI specifications, c
 potentially breaking changes, and (in later phases) analyzes frontend source code to surface
 evidence-backed impact.
 
-> **Status:** Phase 1 foundation. The UI currently renders clearly labeled demo content. The
-> OpenAPI engine, persistence, source analysis, graph, and authentication are not implemented yet.
+> **Status:** Phase 2 engine. The OpenAPI parse/validate/compare/classify engine
+> lives in `packages/engine` and is fully tested. It is not yet wired to the
+> Express API or the UI, and the UI still renders clearly labeled demo content.
+> Persistence, source analysis, graph, reports, and authentication are not
+> implemented yet.
 
 ## Stack
 
@@ -14,6 +17,7 @@ evidence-backed impact.
 - **Backend:** Node.js, Express 5, TypeScript (`apps/api`).
 - **Database:** PostgreSQL via Prisma (`apps/api/prisma`).
 - **Shared:** framework-agnostic types (`packages/shared`).
+- **Engine:** standalone OpenAPI comparison engine (`packages/engine`).
 - **Package manager:** npm (workspaces). Commit `package-lock.json`; do not introduce a second lockfile.
 
 ## Repository layout
@@ -28,8 +32,9 @@ contract-ripple/            # git repo root (frontend + workspaces)
 │       ├── src/
 │       └── prisma/
 ├── packages/
+│   ├── engine/             # OpenAPI parse/validate/normalize/compare/classify
 │   └── shared/             # shared types
-├── docs/                   # plan, architecture, design review
+├── docs/                   # plan, architecture, design review, engine docs
 ├── AGENTS.md               # permanent project instructions
 └── .env.example
 ```
@@ -78,14 +83,37 @@ npm run api:dev
 | `npm run build` | Production build of the frontend |
 | `npm run start` | Start the production frontend |
 | `npm run lint` | ESLint on the frontend source |
-| `npm run typecheck` | Type-check the frontend, build shared types, type-check the API |
+| `npm run typecheck` | Type-check the frontend, build shared + engine, type-check the API |
 | `npm test` | Run unit tests with Vitest |
 | `npm run test:watch` | Vitest watch mode |
 | `npm run api:dev` | Start the Express API in watch mode |
 | `npm run api:start` | Start the compiled API |
-| `npm run build:api` | Build shared types and the API |
-| `npm run build:all` | Build frontend + shared + API |
+| `npm run build:shared` | Build the shared types package |
+| `npm run build:engine` | Build the OpenAPI engine |
+| `npm run build:api` | Build shared + engine + API |
+| `npm run build:all` | Build frontend + shared + engine + API |
 | `npm run db:validate` | Validate the Prisma schema |
+
+## OpenAPI engine
+
+`packages/engine` exposes a clean, HTTP-independent interface:
+
+```ts
+import { compareContracts } from "@contract-ripple/engine";
+
+const result = await compareContracts({
+  baseline: { content: baselineJsonOrYaml },
+  candidate: { content: candidateJsonOrYaml },
+});
+```
+
+It supports OpenAPI 3.0.x/3.1.x JSON and YAML, resolves internal `$ref`s,
+detects circular references, never fetches external references, and returns
+deterministic findings with JSON Pointers, explanations, and
+`non_breaking`/`potentially_breaking`/`unknown` labels.
+
+See `docs/engine.md` for classification rules, security limits, library
+evaluation, and known limitations.
 
 ## Environment variables
 
@@ -117,13 +145,17 @@ Unknown routes return a consistent `{ error: { code, message } }` envelope.
 Unit tests use Vitest and live next to the code they cover:
 
 - `packages/shared/src/index.test.ts`
+- `packages/engine/src/*.test.ts`
 - `apps/api/src/services/health.test.ts`
 
 ```bash
 npm test
 ```
 
-No database-dependent tests exist yet; Phase 3 will add an isolated test database setup.
+Engine tests cover parsing/validation failures, all required change classes,
+references, circular references, external references, deterministic ordering,
+JSON Pointer escaping, input limits, and security cases. No database-dependent
+tests exist yet; Phase 3 will add an isolated test database setup.
 
 ## Deployment
 
@@ -137,6 +169,7 @@ No database-dependent tests exist yet; Phase 3 will add an isolated test databas
 - `AGENTS.md` — permanent project rules.
 - `docs/development-plan.md` — scope, phases, and decisions.
 - `docs/architecture.md` — boundaries and data flow.
+- `docs/engine.md` — OpenAPI engine interface, rules, and limitations.
 - `docs/design-review.md` — UI review and improvement priorities.
 
 ## Demo data

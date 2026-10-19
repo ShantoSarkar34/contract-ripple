@@ -37,8 +37,8 @@ See `docs/architecture.md` for boundaries and data flow.
 | Phase | Scope | Key deliverables | Status |
 | --- | --- | --- | --- |
 | **0** | Permanent instructions | `AGENTS.md` | **Done** |
-| **1** | Audit + foundation | audit report, `docs/development-plan.md`, `docs/architecture.md`, `docs/design-review.md`, scripts, env examples, Express/Prisma scaffold | **In progress** |
-| **2** | OpenAPI engine | parsing, validation, comparison, classification, tests, clean engine interface | Planned |
+| **1** | Audit + foundation | audit report, `docs/development-plan.md`, `docs/architecture.md`, `docs/design-review.md`, scripts, env examples, Express/Prisma scaffold | **Done** |
+| **2** | OpenAPI engine | parsing, validation, comparison, classification, tests, clean engine interface | **In review** |
 | **3** | Backend + database | Prisma models, `/api/v1`, persistence, real frontend integration | Planned |
 | **4** | Source analysis | AST matching, secure ZIP pipeline, real GitHub integration, evidence | Planned |
 | **5** | Impact graph + UI | evidence-backed graph, filterable findings, accessible views | Planned |
@@ -59,6 +59,34 @@ Each phase ends with a completion report and stops. No phase starts automaticall
 - **Backend scaffold only.** Health endpoint plus configuration and Prisma schema. No analysis
   engine, persistence models, authentication, GitHub integration, or source analysis yet.
 
+## Phase 2 decisions (this phase)
+
+- **Engine package:** `packages/engine` is a standalone npm workspace with no
+  HTTP, database, auth, GitHub, ZIP, or graph dependencies. The public entry
+  point is `compareContracts`.
+- **Parser:** `@readme/openapi-parser` 9.1.0 validates OpenAPI 3.0.x/3.1.x.
+  External and file resolution are disabled. Because `validate()` mutates and
+  dereferences its input, the engine validates a clone while keeping the
+  original `$ref` structure for its own cycle-safe normalizer.
+- **YAML:** `yaml` 2.9.1 with strict parsing, unique keys, `maxAliasCount: 100`,
+  and the core schema. No executable/custom tags.
+- **Custom comparator:** `openapi-diff` was evaluated but not selected because
+  it does not expose stable JSON Pointers/evidence for every change and its
+  OpenAPI 3.1 support was unverified. A controlled comparator guarantees
+  deterministic ordering, direction-aware classifications, and explicit
+  `unknown` handling.
+- **Risk model:** `non_breaking`, `potentially_breaking`, and `unknown`, with
+  request-versus-response rules and human-readable explanations. The rules live
+  in `classify.ts`, separate from traversal.
+- **Determinism:** parameters and `oneOf`/`anyOf` alternatives are canonicalized
+  before normalization; findings are sorted and assigned deterministic IDs.
+- **Security limits:** 5 MiB per document by default (50 MiB cap), 128-level
+  nesting, circular-alias rejection, 5-second validation timeout, external refs
+  disabled, and a 5,000-finding default cap (100,000 cap).
+
+See `docs/engine.md` for the full interface, classification table, and
+limitations.
+
 ## Non-goals for Phase 1
 
 - OpenAPI comparison logic.
@@ -69,6 +97,16 @@ Each phase ends with a completion report and stops. No phase starts automaticall
 - Impact graph.
 - Full UI redesign.
 
+## Non-goals for Phase 2
+
+- Database models, migrations, and persistence.
+- Express routes that accept or store contracts.
+- Authentication/authorization.
+- GitHub OAuth/App integration.
+- ZIP/source analysis, AST matching, and graph construction.
+- Frontend wiring to real comparison results.
+- Full JSON Schema validation or example-payload validation.
+
 ## Risks and open questions
 
 - **Vercel root directory:** if the frontend later moves to `apps/web`, the Vercel project root must
@@ -78,3 +116,11 @@ Each phase ends with a completion report and stops. No phase starts automaticall
 - **Windows/SWC:** native `@next/swc-win32-x64-msvc` fails to load; Next falls back to WASM. Keep
   `--webpack` until the environment is verified otherwise.
 - **Demo data:** the current UI is hardcoded. It must remain labeled until Phase 3 wires real APIs.
+- **Parser mutation:** `@readme/openapi-parser` dereferences in place and can
+  create circular object graphs. The engine validates a clone; do not remove
+  that isolation when wiring Phase 3.
+- **External references:** uploaded contracts may contain external `$ref`s.
+  They are never fetched; changes involving them are `unknown`, not silently
+  assumed safe.
+- **YAML resource exhaustion:** alias bombs and circular aliases are bounded or
+  rejected. Keep these limits when adding alternate parsers.
