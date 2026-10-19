@@ -11,10 +11,10 @@
   },
   "scripts": {
     "dev": "next dev --webpack",
-    "build": "next build --webpack",
+    "build": "npm run build -w @contract-ripple/shared && next build --webpack",
     "start": "next start",
     "lint": "eslint src",
-    "typecheck": "tsc --noEmit && npm run build -w @contract-ripple/shared && npm run build -w @contract-ripple/engine && npm run typecheck -w @contract-ripple/api",
+    "typecheck": "npm run build -w @contract-ripple/shared && npm run build -w @contract-ripple/engine && tsc --noEmit && npm run typecheck -w @contract-ripple/api",
     "test": "vitest run",
     "test:watch": "vitest",
     "build:shared": "npm run build -w @contract-ripple/shared",
@@ -23,9 +23,13 @@
     "build:all": "npm run build && npm run build:api",
     "api:dev": "npm run dev -w @contract-ripple/api",
     "api:start": "npm run start -w @contract-ripple/api",
-    "db:validate": "npm run db:validate -w @contract-ripple/api"
+    "db:validate": "npm run db:validate -w @contract-ripple/api",
+    "db:generate": "npm run db:generate -w @contract-ripple/api",
+    "db:migrate": "npm run db:migrate -w @contract-ripple/api",
+    "db:deploy": "npm run db:deploy -w @contract-ripple/api"
   },
   "dependencies": {
+    "@contract-ripple/shared": "*",
     "next": "16.4.2",
     "react": "19.3.0",
     "react-dom": "19.3.0"

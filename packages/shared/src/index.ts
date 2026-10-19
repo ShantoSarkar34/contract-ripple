@@ -1,9 +1,10 @@
 /**
- * Shared, framework-agnostic types used by the web app and the API.
+ * Shared, framework-agnostic types and schemas used by the web app and the API.
  *
  * Keep this package free of database access, HTTP handlers, and analysis logic.
- * Analysis-specific schemas will be added alongside the OpenAPI engine in Phase 2.
  */
+
+export * from "./api.js";
 
 export type HealthResponse = {
   status: "ok";

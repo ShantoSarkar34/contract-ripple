@@ -38,8 +38,8 @@ See `docs/architecture.md` for boundaries and data flow.
 | --- | --- | --- | --- |
 | **0** | Permanent instructions | `AGENTS.md` | **Done** |
 | **1** | Audit + foundation | audit report, `docs/development-plan.md`, `docs/architecture.md`, `docs/design-review.md`, scripts, env examples, Express/Prisma scaffold | **Done** |
-| **2** | OpenAPI engine | parsing, validation, comparison, classification, tests, clean engine interface | **In review** |
-| **3** | Backend + database | Prisma models, `/api/v1`, persistence, real frontend integration | Planned |
+| **2** | OpenAPI engine | parsing, validation, comparison, classification, tests, clean engine interface | **Done** |
+| **3** | Backend + database | Prisma models, migrations, `/api/v1`, persistence, real frontend integration | **In review** |
 | **4** | Source analysis | AST matching, secure ZIP pipeline, real GitHub integration, evidence | Planned |
 | **5** | Impact graph + UI | evidence-backed graph, filterable findings, accessible views | Planned |
 | **6** | Reports + history | saved history, JSON/readable exports, regression suggestions | Planned |
@@ -87,6 +87,50 @@ Each phase ends with a completion report and stops. No phase starts automaticall
 See `docs/engine.md` for the full interface, classification table, and
 limitations.
 
+## Phase 3 decisions (this phase)
+
+- **Persistence models:** `Project`, `Contract`, `ContractVersion`,
+  `AnalysisRun`, and `Finding` in PostgreSQL. `ContractVersion` stores the raw
+  JSON/YAML text plus a SHA-256 checksum and parsed metadata; `AnalysisRun`
+  stores summary counts, engine limitations, and the baseline/candidate
+  summaries; `Finding` stores one row per engine finding with its original
+  order (`position`) so reads are stable.
+- **Migrations without a shadow database:** the initial migration was generated
+  with `prisma migrate diff --from-empty --to-schema-datamodel` and applied with
+  `prisma migrate deploy`, because the managed Prisma Postgres instance does not
+  provide a shadow database for `migrate dev`. A second incremental migration
+  adds `Finding.position`.
+- **Repository boundary:** services depend on a `Repository` interface. A
+  Prisma implementation is used in production and an in-memory implementation is
+  used by route/service tests. This keeps HTTP and engine tests independent of a
+  database.
+- **Request validation:** `zod` schemas live in `packages/shared` and are reused
+  by the API; the client imports their inferred types. Unknown fields are
+  stripped, and body size is bounded before the engine runs.
+- **Upload size handling:** contract text is sent as a JSON string, so the
+  Express JSON body limit is 8 MiB, slightly above the engine's 5 MiB
+  per-document limit. Comparisons reference stored version IDs, so comparison
+  requests stay small.
+- **Errors:** services throw typed `HttpError`s; engine failures are mapped to
+  `400`/`413`/`422` with stable codes and sanitized details. The API never
+  returns raw spec contents or stack traces.
+- **Frontend wiring:** the `/contracts` route is a client workspace that talks
+  to the API through `NEXT_PUBLIC_API_BASE_URL`, showing real loading, empty,
+  error, and result states. The marketing page keeps clearly labeled demo
+  content.
+- **No authentication yet:** as agreed, auth and ownership checks are deferred to
+  Phase 7. Until then the API must not be exposed publicly with real user data.
+
+See `docs/api.md` for the endpoint reference.
+
+## Non-goals for Phase 3
+
+- Authentication/authorization and per-user ownership.
+- Source analysis (ZIP upload, AST matching) and GitHub integration.
+- Impact graph construction and report exports.
+- Regression-test suggestions.
+- Rate limiting, request quotas, and background/queued analysis.
+
 ## Non-goals for Phase 1
 
 - OpenAPI comparison logic.
@@ -115,10 +159,11 @@ limitations.
   install and verifies lint. CI should use a clean `npm ci`.
 - **Windows/SWC:** native `@next/swc-win32-x64-msvc` fails to load; Next falls back to WASM. Keep
   `--webpack` until the environment is verified otherwise.
-- **Demo data:** the current UI is hardcoded. It must remain labeled until Phase 3 wires real APIs.
+- **Demo data:** the landing page (`/`) is still hardcoded and must stay labeled as demo. The
+  `/contracts` workspace now shows real analysis only; do not reintroduce hardcoded results there.
 - **Parser mutation:** `@readme/openapi-parser` dereferences in place and can
   create circular object graphs. The engine validates a clone; do not remove
-  that isolation when wiring Phase 3.
+  that isolation in the API/engine integration.
 - **External references:** uploaded contracts may contain external `$ref`s.
   They are never fetched; changes involving them are `unknown`, not silently
   assumed safe.

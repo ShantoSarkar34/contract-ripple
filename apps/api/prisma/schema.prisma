@@ -1,9 +1,7 @@
 // ContractRipple database schema.
 //
-// Phase 1 establishes the Prisma configuration only. The domain models
-// (Project, Contract, ContractVersion, AnalysisRun, Finding) are designed and
-// added in Phase 3 together with the API. Ownership fields are added with
-// authentication in Phase 7.
+// Domain models for persisted projects, contract versions, comparison runs,
+// and findings. Ownership fields are added with authentication in Phase 7.
 //
 // Never put real credentials in this file; the connection string comes from the
 // DATABASE_URL environment variable.
@@ -15,4 +13,101 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+enum AnalysisStatus {
+  completed
+  failed
+}
+
+model Project {
+  id           String        @id @default(cuid())
+  name         String
+  description  String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  contracts    Contract[]
+  analysisRuns AnalysisRun[]
+}
+
+model Contract {
+  id        String            @id @default(cuid())
+  projectId String
+  project   Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  versions  ContractVersion[]
+
+  @@index([projectId])
+}
+
+model ContractVersion {
+  id             String        @id @default(cuid())
+  contractId     String
+  contract       Contract      @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  label          String?
+  format         String
+  rawContent     String
+  checksum       String
+  openapiVersion String?
+  title          String?
+  infoVersion    String?
+  warnings       Json?
+  createdAt      DateTime      @default(now())
+  baselineRuns   AnalysisRun[] @relation("BaselineVersion")
+  candidateRuns  AnalysisRun[] @relation("CandidateVersion")
+
+  @@index([contractId])
+  @@index([checksum])
+}
+
+model AnalysisRun {
+  id                       String          @id @default(cuid())
+  projectId                String
+  project                  Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  baselineVersionId        String
+  baselineVersion          ContractVersion @relation("BaselineVersion", fields: [baselineVersionId], references: [id], onDelete: Cascade)
+  candidateVersionId       String
+  candidateVersion         ContractVersion @relation("CandidateVersion", fields: [candidateVersionId], references: [id], onDelete: Cascade)
+  label                    String?
+  status                   AnalysisStatus  @default(completed)
+  truncated                Boolean         @default(false)
+  totalFindings            Int
+  nonBreakingCount         Int
+  potentiallyBreakingCount Int
+  unknownCount             Int
+  durationMs               Int
+  limitations              Json?
+  baselineSummary          Json?
+  candidateSummary         Json?
+  createdAt                DateTime        @default(now())
+  findings                 Finding[]
+
+  @@index([projectId])
+  @@index([createdAt])
+}
+
+model Finding {
+  id            String      @id @default(cuid())
+  analysisRunId String
+  analysisRun   AnalysisRun @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
+  position      Int
+  engineId      String
+  category      String
+  changeType    String
+  risk          String
+  path          String?
+  method        String?
+  operationId   String?
+  location      String
+  summary       String
+  explanation   String
+  before        String?
+  after         String?
+  createdAt     DateTime    @default(now())
+
+  @@unique([analysisRunId, engineId])
+  @@index([analysisRunId])
+  @@index([risk])
 }
