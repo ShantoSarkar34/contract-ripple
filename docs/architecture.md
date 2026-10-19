@@ -1,27 +1,32 @@
 # ContractRipple — Architecture
 
-## Current state (Phase 1)
+## Current state (Phase 2)
 
-The repository currently contains one application: a Next.js App Router frontend at the repository
-root. It renders a single marketing/demo page from hardcoded component data. There is no backend,
-database, authentication, or analysis code yet.
+The repository contains one Next.js application at the repository root, an
+Express API scaffold, a shared types package, and a standalone OpenAPI
+comparison engine. The frontend still renders hardcoded demo content; the
+engine is not yet wired to HTTP or persistence.
 
 ```
 contract-ripple/            # git repo root
 ├── src/app/                # Next.js App Router (frontend)
 ├── src/components/         # presentation components (demo data)
-├── apps/api/               # Express API scaffold (new)
-├── packages/shared/        # shared types/schemas (new)
-├── docs/                   # plans, architecture, design review
+├── apps/api/               # Express API scaffold
+├── packages/shared/        # shared types/schemas
+├── packages/engine/        # OpenAPI parse/validate/normalize/compare/classify
+├── docs/                   # plans, architecture, design review, engine docs
 ├── .env.example            # frontend placeholders
 └── apps/api/.env.example   # backend placeholders
 ```
 
+Tests live beside the source in `packages/shared`, `packages/engine`, and
+`apps/api` and run through Vitest.
+
 ## Monorepo strategy
 
 **Incremental, not destructive.** The frontend remains at the root so the existing Vercel
-deployment (`contractripple.vercel.app`) is unaffected. npm workspaces attach `apps/api` and
-`packages/shared`.
+deployment (`contractripple.vercel.app`) is unaffected. npm workspaces attach `apps/api`,
+`packages/shared`, and `packages/engine`.
 
 Future target (requires separate approval and a Vercel root-directory change):
 
@@ -29,11 +34,12 @@ Future target (requires separate approval and a Vercel root-directory change):
 apps/web/        # moved Next.js frontend
 apps/api/        # Express backend
 packages/shared/ # shared schemas/types
+packages/engine/ # OpenAPI comparison engine
 docs/
 prompts/
 ```
 
-Moving the frontend is not performed in Phase 1 because it risks breaking the live deployment.
+Moving the frontend is not performed in Phase 2 because it risks breaking the live deployment.
 
 ## Boundaries
 
@@ -55,17 +61,22 @@ Moving the frontend is not performed in Phase 1 because it risks breaking the li
 - Genuinely shared types and schemas only.
 - No framework-specific code, no database access, no analysis implementation.
 
-### Analysis engine (Phase 2)
-Separate, independently testable modules:
+### Analysis engine (`packages/engine`)
+Independent, testable modules:
 
 ```
-parse (JSON/YAML) → validate → normalize → compare → classify → serialize findings
+parse (JSON/YAML) → validate → canonicalize → normalize → compare → classify → serialize findings
 ```
 
-- Parsing/validation must not be coupled to HTTP.
-- Comparison results are normalized into a stable finding model.
+- Parsing/validation is not coupled to HTTP.
+- Comparison results are normalized into a stable finding model with
+  deterministic IDs and ordering.
 - Classification labels: `non_breaking`, `potentially_breaking`, `unknown`.
-- Every finding carries an explanation and an evidence path/JSON Pointer where available.
+- Every finding carries an explanation and an evidence JSON Pointer where
+  available.
+- External references are never fetched. Circular references are detected.
+- See `docs/engine.md` for the public interface, classification rules,
+  library evaluation, and limitations.
 
 ## Data flow (target)
 
@@ -128,5 +139,6 @@ Phase 1 `schema.prisma` contains only the datasource/generator so model design h
 
 - Backend hosting provider (decided in Phase 7 after runtime requirements are verified).
 - Full monorepo move of the frontend to `apps/web` (separate approved migration).
-- OpenAPI parser/diff library choice (evaluated and documented in Phase 2).
+- OpenAPI parser/diff library choice — resolved in Phase 2 and documented in
+  `docs/engine.md`.
 - Graph library choice (evaluated and documented in Phase 5).
