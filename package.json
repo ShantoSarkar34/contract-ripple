@@ -2,11 +2,27 @@
   "name": "contract-ripple",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
     "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit && npm run build -w @contract-ripple/shared && npm run typecheck -w @contract-ripple/api",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build:shared": "npm run build -w @contract-ripple/shared",
+    "build:api": "npm run build -w @contract-ripple/shared && npm run build -w @contract-ripple/api",
+    "build:all": "npm run build && npm run build:api",
+    "api:dev": "npm run dev -w @contract-ripple/api",
+    "api:start": "npm run start -w @contract-ripple/api",
+    "db:validate": "npm run db:validate -w @contract-ripple/api"
   },
   "dependencies": {
     "next": "16.4.2",
@@ -22,6 +38,7 @@
     "eslint-config-next": "16.4.2",
     "postcss": "^8.5.31",
     "tailwindcss": "^3.4.19",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.0.0"
   }
 }

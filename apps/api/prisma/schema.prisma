@@ -1,0 +1,18 @@
+// ContractRipple database schema.
+//
+// Phase 1 establishes the Prisma configuration only. The domain models
+// (Project, Contract, ContractVersion, AnalysisRun, Finding) are designed and
+// added in Phase 3 together with the API. Ownership fields are added with
+// authentication in Phase 7.
+//
+// Never put real credentials in this file; the connection string comes from the
+// DATABASE_URL environment variable.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
