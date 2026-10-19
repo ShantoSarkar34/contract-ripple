@@ -1,26 +1,30 @@
 # ContractRipple — Architecture
 
-## Current state (Phase 2)
+## Current state (Phase 3)
 
 The repository contains one Next.js application at the repository root, an
-Express API scaffold, a shared types package, and a standalone OpenAPI
-comparison engine. The frontend still renders hardcoded demo content; the
-engine is not yet wired to HTTP or persistence.
+Express API with persistence, a shared types/schemas package, and a standalone
+OpenAPI comparison engine. The `/contracts` route is wired to the real API and
+database; the marketing page (`/`) still renders clearly labeled demo content.
 
 ```
 contract-ripple/            # git repo root
 ├── src/app/                # Next.js App Router (frontend)
-├── src/components/         # presentation components (demo data)
-├── apps/api/               # Express API scaffold
-├── packages/shared/        # shared types/schemas
+│   └── contracts/          # real workspace (client component)
+├── src/components/         # presentation components (demo + contracts workspace)
+├── src/lib/                # frontend API client and view helpers
+├── apps/api/               # Express API (routes, services, repositories)
+│   └── prisma/             # Prisma schema + migrations
+├── packages/shared/        # shared types/schemas (zod request schemas)
 ├── packages/engine/        # OpenAPI parse/validate/normalize/compare/classify
-├── docs/                   # plans, architecture, design review, engine docs
+├── docs/                   # plans, architecture, design review, engine/API docs
 ├── .env.example            # frontend placeholders
 └── apps/api/.env.example   # backend placeholders
 ```
 
 Tests live beside the source in `packages/shared`, `packages/engine`, and
-`apps/api` and run through Vitest.
+`apps/api` and run through Vitest. One database integration test is skipped
+unless `RUN_DB_TESTS=1` is set.
 
 ## Monorepo strategy
 
@@ -78,37 +82,43 @@ parse (JSON/YAML) → validate → canonicalize → normalize → compare → cl
 - See `docs/engine.md` for the public interface, classification rules,
   library evaluation, and limitations.
 
-## Data flow (target)
+## Data flow (implemented in Phase 3)
 
 ```
-Contract upload (JSON/YAML)
+Contract upload (JSON/YAML text, ≤ 5 MiB)
         │
         ▼
-Validate + normalize ──► ContractVersion (PostgreSQL)
+Engine parse + validate + normalize ──► ContractVersion (PostgreSQL, raw text + checksum)
         │
         ▼
-Compare baseline ↔ candidate ──► Findings (normalized, classified)
+Compare stored baseline ↔ candidate ──► AnalysisRun + Finding rows (classified)
         │
-        ├──► Source analysis (ZIP / GitHub) ──► SourceReferences + evidence
+        ├──► /contracts workspace reads and displays real findings with JSON Pointers
         │
-        ├──► Impact graph (nodes/edges from real findings + references)
-        │
-        └──► Reports (JSON / readable) + regression suggestions
+        ├──► Source analysis (ZIP / GitHub) ──► SourceReferences + evidence   (Phase 4)
+        ├──► Impact graph (nodes/edges from real findings + references)       (Phase 5)
+        └──► Reports (JSON / readable) + regression suggestions               (Phase 6)
 ```
 
-## API surface (planned, Phase 3+)
+## API surface (implemented in Phase 3)
 
 Under `/api/v1`:
 
-- `GET /health` — liveness (implemented in Phase 1 scaffold).
-- `GET /ready` — readiness, including database connectivity (Phase 3).
-- Projects: create/list/read/update.
-- Contract versions: upload/validate/read.
-- Comparisons: run comparison, read saved analysis runs and findings.
+- `GET /health` — liveness.
+- `GET /ready` — readiness, including database connectivity (`200`/`503`).
+- Projects: `POST /projects`, `GET /projects`, `GET /projects/:projectId`,
+  `PATCH /projects/:projectId`.
+- Contracts: `POST /projects/:projectId/contracts`,
+  `GET /projects/:projectId/contracts`, `GET /contracts/:contractId`.
+- Versions: `POST /contracts/:contractId/versions` (validates before saving),
+  `GET /contracts/:contractId/versions`, `GET /versions/:versionId`.
+- Comparisons: `POST /projects/:projectId/comparisons`,
+  `GET /projects/:projectId/comparisons`, `GET /comparisons/:comparisonId`.
 - Source analysis: ZIP upload and GitHub-connected analysis (Phase 4).
 - Reports/exports (Phase 6).
 
-All mutating endpoints will require authentication and ownership checks in Phase 7.
+See `docs/api.md` for request/response shapes and error codes. All mutating
+endpoints will require authentication and ownership checks in Phase 7.
 
 ## Security boundaries
 
@@ -120,11 +130,15 @@ All mutating endpoints will require authentication and ownership checks in Phase
 - No secrets in logs, client responses, or repository files.
 - CORS uses an explicit origin allowlist from environment configuration.
 
-## Persistence (planned, Phase 3)
+## Persistence (implemented in Phase 3)
 
-Prisma + PostgreSQL. Planned models: `Project`, `Contract`, `ContractVersion`, `AnalysisRun`,
-`Finding`. Ownership fields are added with authentication in Phase 7. No models exist yet; the
-Phase 1 `schema.prisma` contains only the datasource/generator so model design happens with the API.
+Prisma + PostgreSQL. Models: `Project`, `Contract`, `ContractVersion`,
+`AnalysisRun`, `Finding`, with `AnalysisStatus` as a Postgres enum. Cascading
+deletes remove contracts, versions, runs, and findings with their parent
+project. `ContractVersion` stores untrusted spec text plus a SHA-256 checksum;
+`Finding` keeps its engine order via `position`. Ownership fields are added with
+authentication in Phase 7. Migrations live in `apps/api/prisma/migrations` and
+are applied with `prisma migrate deploy`.
 
 ## Deployment
 

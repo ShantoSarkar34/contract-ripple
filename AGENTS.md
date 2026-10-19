@@ -14,6 +14,13 @@ Before each phase:
 4. Review the files changed and test the result.
 5. Do not proceed until the phase's acceptance criteria are satisfied.
 
+### Branch policy (mandatory)
+
+- Do all phase work on the `open-branch` branch. Do not create a separate branch for each phase.
+- Commit and push each phase to `origin/open-branch`.
+- Never push to `main`. The user reviews and merges `open-branch` into `main` manually.
+- If `open-branch` is behind `origin/main`, fast-forward it from `origin/main` before starting a phase.
+
 Before editing any files, inspect the existing repository, its Git status, package manager, dependencies, application structure, tests, and deployment configuration.
 
 At the end of every phase, produce the completion report defined in section 9 and then stop.
@@ -56,7 +63,7 @@ Suggested target structure:
 
 This structure is a **target**, not permission to rewrite the existing repository without inspection. Determine the safest migration path first and obtain approval before restructuring.
 
-**Current baseline (inspected at Phase 2):** the Next.js app lives at the repository root (`src/app`), not in `apps/web`. The Express API scaffold (`apps/api`), shared types (`packages/shared`), OpenAPI engine (`packages/engine`), tests, and `docs` now exist. See section 10 for verified details. Migration to the monorepo layout must be planned and approved as its own task.
+**Current baseline (inspected at Phase 3):** the Next.js app lives at the repository root (`src/app`), not in `apps/web`. The Express API (`apps/api`) now has Prisma models, migrations, REST routes, and persistence; `packages/shared` holds shared types and zod request schemas; `packages/engine` holds the OpenAPI comparison engine; tests and `docs` exist. See section 10 for verified details. Migration to the monorepo layout must be planned and approved as its own task.
 
 ---
 
@@ -167,7 +174,7 @@ Stop after the requested phase.
 
 ---
 
-## 10. Current repository baseline (Phase 2 inspection)
+## 10. Current repository baseline (Phase 3 inspection)
 
 Recorded so future phases start from verified facts. Update this section only when the baseline actually changes.
 
@@ -176,16 +183,18 @@ Recorded so future phases start from verified facts. Update this section only wh
 - **Deployment:** frontend deployed at `contractripple.vercel.app`.
 - **Package manager:** npm with workspaces (`apps/*`, `packages/*`); `package-lock.json` is the single lockfile. Do not introduce a second lockfile without approval.
 - **Frontend:** Next.js `16.4.2`, React `19.3.0`, TypeScript `^5`, Tailwind CSS `3.4.19`, ESLint `9` with `eslint-config-next`.
-- **App structure:** App Router under `src/app`; UI components under `src/components`; path alias `@/* -> ./src/*`.
-- **Build tooling:** `npm run dev` and `npm run build` use `next dev --webpack` / `next build --webpack`. Turbopack native bindings are unavailable in the current Windows environment, so do not switch back to Turbopack without testing.
-- **Next.js config:** `cacheComponents: true` and `partialPrefetching: true`.
-- **Backend (`apps/api`):** Express 5 + TypeScript ESM scaffold. It exposes `GET /api/v1/health`, env configuration, CORS allowlisting, a consistent error envelope, and a Prisma schema containing only datasource/generator configuration. No Prisma models, migrations, or contract-analysis routes yet.
-- **Shared package (`packages/shared`):** framework-agnostic types (`HealthResponse`, `ApiErrorResponse`, `isApiErrorResponse`) with Vitest tests.
+- **App structure:** App Router under `src/app`; UI components under `src/components`; client API helper under `src/lib`; path alias `@/* -> ./src/*`. The `/contracts` route is a real client workspace; `/` remains labeled demo content.
+- **Build tooling:** `npm run dev` and `npm run build` use `next dev --webpack` / `next build --webpack`. The root `build`/`typecheck` scripts build `packages/shared` (and `packages/engine`) first because the frontend consumes shared types.
+- **Next.js config:** `cacheComponents: true` and `partialPrefetching: true`. Data fetching for the workspace happens client-side, so pages stay static.
+- **Backend (`apps/api`):** Express 5 + TypeScript ESM. Exposes `GET /api/v1/health` and `/ready`, project/contract/version/comparison routes, request validation with zod schemas from `packages/shared`, a `Repository` boundary (Prisma implementation + in-memory test implementation), consistent error envelopes, and CORS allowlisting. Depends on `@contract-ripple/engine`, `@contract-ripple/shared`, `@prisma/client` 6.19.3, `express` 5, `cors`, `dotenv`, and `zod`.
+- **Database:** Prisma + PostgreSQL. Models: `Project`, `Contract`, `ContractVersion`, `AnalysisRun`, `Finding`, with the `AnalysisStatus` enum. Migrations live in `apps/api/prisma/migrations` (initial migration generated with `migrate diff` because the managed Prisma Postgres instance provides no shadow database; applied with `prisma migrate deploy`). No ownership fields yet.
+- **Shared package (`packages/shared`):** framework-agnostic types plus zod request schemas and DTO types, with Vitest tests. Depends on `zod` 4.
 - **Engine package (`packages/engine`):** standalone OpenAPI 3.0.x/3.1.x comparison engine. Pipeline: size/depth/cycle checks → JSON/YAML parse → OpenAPI validation → canonicalization → normalization → comparison → risk classification → deterministic serialization. Public entry point: `compareContracts`. Dependencies: `@readme/openapi-parser` 9.1.0, `yaml` 2.9.1, `openapi-types` 12.1.3. See `docs/engine.md`.
-- **Testing:** Vitest from the repository root. Coverage includes shared types, API health behaviour, and the engine's parsing, validation, comparison, classification, reference, determinism, and security cases. No database-dependent tests yet.
-- **Docs:** `docs/development-plan.md`, `docs/architecture.md`, `docs/design-review.md`, `docs/engine.md`.
-- **Not present yet:** Prisma models/migrations, database-backed API routes, authentication/authorization, GitHub integration, ZIP/source analysis, impact graph, reports/history exports, and real frontend analysis wiring.
-- **Data:** the current UI renders hardcoded demo content and must remain clearly labeled as demo until wired to real analysis.
+- **Testing:** Vitest from the repository root. Coverage includes shared schemas, API services/routes (in-memory repository and real HTTP), and the engine's parsing, validation, comparison, classification, reference, determinism, and security cases. One PostgreSQL integration test runs only with `RUN_DB_TESTS=1`.
+- **Docs:** `docs/development-plan.md`, `docs/architecture.md`, `docs/design-review.md`, `docs/engine.md`, `docs/api.md`.
+- **API auth:** none yet. Authentication/authorization and per-user ownership are deferred to Phase 7; the API must not be exposed publicly with real user data until then.
+- **Not present yet:** authentication/authorization, GitHub integration, ZIP/source analysis, impact graph, reports/history exports, and regression-test suggestions.
+- **Data:** the landing page renders hardcoded demo content and remains clearly labeled as demo. The `/contracts` workspace shows real comparison results only.
 - **Frontend AGENTS note:** the block at the end of this file is generated by `next dev`; keep it intact.
 
 **Known structural issue to resolve with approval:** the git repository is nested inside the workspace root. A monorepo (`apps/web`, `apps/api`, `packages/shared`) will eventually need a single repository root at the intended monorepo location. Plan that migration explicitly; do not move the repo or change Vercel settings without authorization.

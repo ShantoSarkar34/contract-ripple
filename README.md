@@ -5,11 +5,11 @@ potential impact on frontend integrations. It compares OpenAPI specifications, c
 potentially breaking changes, and (in later phases) analyzes frontend source code to surface
 evidence-backed impact.
 
-> **Status:** Phase 2 engine. The OpenAPI parse/validate/compare/classify engine
-> lives in `packages/engine` and is fully tested. It is not yet wired to the
-> Express API or the UI, and the UI still renders clearly labeled demo content.
-> Persistence, source analysis, graph, reports, and authentication are not
-> implemented yet.
+> **Status:** Phase 3. The OpenAPI engine is wired to an Express API with
+> PostgreSQL persistence, and the `/contracts` workspace runs real comparisons
+> and shows classified findings with JSON Pointer evidence. The landing page
+> (`/`) still renders clearly labeled demo content. Source analysis, the impact
+> graph, reports, and authentication are not implemented yet.
 
 ## Stack
 
@@ -26,15 +26,16 @@ evidence-backed impact.
 contract-ripple/            # git repo root (frontend + workspaces)
 ├── src/                    # Next.js frontend
 │   ├── app/
-│   └── components/
+│   ├── components/
+│   └── lib/
 ├── apps/
-│   └── api/                # Express API scaffold
+│   └── api/                # Express API (routes, services, repositories)
 │       ├── src/
-│       └── prisma/
+│       └── prisma/         # schema + migrations
 ├── packages/
 │   ├── engine/             # OpenAPI parse/validate/normalize/compare/classify
-│   └── shared/             # shared types
-├── docs/                   # plan, architecture, design review, engine docs
+│   └── shared/             # shared types and zod request schemas
+├── docs/                   # plan, architecture, design review, engine/API docs
 ├── AGENTS.md               # permanent project instructions
 └── .env.example
 ```
@@ -47,7 +48,7 @@ directory).
 
 - Node.js **20.9+** (developed on Node 24).
 - npm (bundled with Node).
-- PostgreSQL (only needed from Phase 3 onward).
+- PostgreSQL (a managed instance is fine; migrations are applied with `prisma migrate deploy`).
 
 ## Setup
 
@@ -58,14 +59,19 @@ npm install
 # frontend environment
 cp .env.example .env.local        # Windows: copy .env.example .env.local
 
-# backend environment (Phase 3+)
+# backend environment
 cp apps/api/.env.example apps/api/.env   # Windows: copy apps/api/.env.example apps/api/.env
+# then set DATABASE_URL in apps/api/.env
+
+# generate the Prisma client and apply migrations
+npm run db:generate
+npm run db:deploy
 ```
 
 ## Run
 
 ```bash
-# Frontend → http://localhost:3000
+# Frontend → http://localhost:3000  (workspace at /contracts)
 npm run dev
 
 # API → http://localhost:4000/api/v1/health
@@ -80,19 +86,22 @@ npm run api:dev
 | Script | Purpose |
 | --- | --- |
 | `npm run dev` | Start the Next.js dev server (Webpack) |
-| `npm run build` | Production build of the frontend |
+| `npm run build` | Build shared, then production-build the frontend (Webpack) |
 | `npm run start` | Start the production frontend |
 | `npm run lint` | ESLint on the frontend source |
-| `npm run typecheck` | Type-check the frontend, build shared + engine, type-check the API |
-| `npm test` | Run unit tests with Vitest |
+| `npm run typecheck` | Build shared + engine, type-check the frontend, type-check the API |
+| `npm test` | Run unit tests with Vitest (DB integration test skipped) |
 | `npm run test:watch` | Vitest watch mode |
-| `npm run api:dev` | Start the Express API in watch mode |
+| `npm run api:dev` | Start the Express API in watch mode (loads `apps/api/.env`) |
 | `npm run api:start` | Start the compiled API |
 | `npm run build:shared` | Build the shared types package |
 | `npm run build:engine` | Build the OpenAPI engine |
 | `npm run build:api` | Build shared + engine + API |
 | `npm run build:all` | Build frontend + shared + engine + API |
 | `npm run db:validate` | Validate the Prisma schema |
+| `npm run db:generate` | Generate the Prisma client |
+| `npm run db:migrate` | Create/apply a dev migration (`prisma migrate dev`) |
+| `npm run db:deploy` | Apply committed migrations (`prisma migrate deploy`) |
 
 ## OpenAPI engine
 
@@ -136,26 +145,57 @@ Never commit real `.env` files. `.gitignore` ignores them but allows `.env.examp
 
 ## API (current)
 
-`GET /api/v1/health` → `{ status: "ok", service, timestamp, uptimeSeconds }`
+Base URL `/api/v1`. All responses are JSON; errors use a consistent
+`{ error: { code, message, details? } }` envelope.
 
-Unknown routes return a consistent `{ error: { code, message } }` envelope.
+- `GET /health` — liveness.
+- `GET /ready` — readiness including database connectivity (`200`/`503`).
+- `POST /projects`, `GET /projects`, `GET /projects/:projectId`,
+  `PATCH /projects/:projectId`
+- `POST /projects/:projectId/contracts`, `GET /projects/:projectId/contracts`,
+  `GET /contracts/:contractId`
+- `POST /contracts/:contractId/versions` (validates before saving),
+  `GET /contracts/:contractId/versions`, `GET /versions/:versionId`
+- `POST /projects/:projectId/comparisons`, `GET /projects/:projectId/comparisons`,
+  `GET /comparisons/:comparisonId`
+
+See `docs/api.md` for request/response fields, error codes, and limits.
+
+> **No authentication yet.** The API is unauthenticated by design until Phase 7.
+> Do not expose it publicly with real user data before then.
 
 ## Testing
 
-Unit tests use Vitest and live next to the code they cover:
+Unit and route tests use Vitest and live next to the code they cover:
 
-- `packages/shared/src/index.test.ts`
-- `packages/engine/src/*.test.ts`
-- `apps/api/src/services/health.test.ts`
+- `packages/shared/src/*.test.ts` — error guards and API request schemas.
+- `packages/engine/src/*.test.ts` — parsing, validation, comparison, classification, security.
+- `apps/api/src/services/*.test.ts` — project/contract/comparison services with an in-memory repository.
+- `apps/api/src/routes/app.test.ts` — real HTTP requests against an ephemeral server.
 
 ```bash
 npm test
 ```
 
-Engine tests cover parsing/validation failures, all required change classes,
+The engine tests cover parsing/validation failures, all required change classes,
 references, circular references, external references, deterministic ordering,
-JSON Pointer escaping, input limits, and security cases. No database-dependent
-tests exist yet; Phase 3 will add an isolated test database setup.
+JSON Pointer escaping, input limits, and security cases. The API tests cover
+input validation, engine error mapping, persistence DTOs, cross-project checks,
+and the full project → contract → version → comparison flow.
+
+One PostgreSQL integration test is skipped by default. Run it against a
+configured `apps/api/.env` database with:
+
+```bash
+# Windows (cmd)
+set RUN_DB_TESTS=1&& npx vitest run apps/api/src/db
+
+# macOS/Linux
+RUN_DB_TESTS=1 npx vitest run apps/api/src/db
+```
+
+It creates a project, uploads two versions, runs a comparison, reads it back, and
+deletes the project at the end.
 
 ## Deployment
 
@@ -169,10 +209,12 @@ tests exist yet; Phase 3 will add an isolated test database setup.
 - `AGENTS.md` — permanent project rules.
 - `docs/development-plan.md` — scope, phases, and decisions.
 - `docs/architecture.md` — boundaries and data flow.
+- `docs/api.md` — REST endpoint reference, error codes, and limits.
 - `docs/engine.md` — OpenAPI engine interface, rules, and limitations.
 - `docs/design-review.md` — UI review and improvement priorities.
 
 ## Demo data
 
-The landing page uses hardcoded demo data. It is labeled as demo and must never be presented as real
-analysis. Real analysis replaces it in Phase 3+.
+The landing page (`/`) uses hardcoded demo data and is labeled as demo. The
+`/contracts` workspace performs real analysis against the API and database. Demo
+content is never presented as real analysis.

@@ -14,10 +14,14 @@
     "db:validate": "prisma validate",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:status": "prisma migrate status",
     "db:studio": "prisma studio"
   },
   "dependencies": {
+    "@contract-ripple/engine": "*",
     "@contract-ripple/shared": "*",
+    "@prisma/client": "6.19.3",
     "cors": "^2.8.5",
     "dotenv": "^17.0.0",
     "express": "^5.0.0"
