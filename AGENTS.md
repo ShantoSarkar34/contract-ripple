@@ -14,6 +14,13 @@ Before each phase:
 4. Review the files changed and test the result.
 5. Do not proceed until the phase's acceptance criteria are satisfied.
 
+### Branch policy (mandatory)
+
+- Do all phase work on the `open-branch` branch. Do not create a separate branch for each phase.
+- Commit and push each phase to `origin/open-branch`.
+- Never push to `main`. The user reviews and merges `open-branch` into `main` manually.
+- If `open-branch` is behind `origin/main`, fast-forward it from `origin/main` before starting a phase.
+
 Before editing any files, inspect the existing repository, its Git status, package manager, dependencies, application structure, tests, and deployment configuration.
 
 At the end of every phase, produce the completion report defined in section 9 and then stop.
