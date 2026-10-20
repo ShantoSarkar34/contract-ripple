@@ -5,7 +5,12 @@ import { PrismaRepository } from "./db/prisma-repository.js";
 
 const env = loadEnv();
 const repository = new PrismaRepository(getPrismaClient());
-const app = createApp({ corsOrigins: env.corsOrigins, repository });
+const app = createApp({
+  corsOrigins: env.corsOrigins,
+  repository,
+  githubToken: env.githubToken,
+  githubApiBaseUrl: env.githubApiBaseUrl,
+});
 
 const server = app.listen(env.port, () => {
   console.log(`[api] listening on http://localhost:${env.port} (${env.nodeEnv})`);

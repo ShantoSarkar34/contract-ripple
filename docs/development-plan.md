@@ -39,8 +39,8 @@ See `docs/architecture.md` for boundaries and data flow.
 | **0** | Permanent instructions | `AGENTS.md` | **Done** |
 | **1** | Audit + foundation | audit report, `docs/development-plan.md`, `docs/architecture.md`, `docs/design-review.md`, scripts, env examples, Express/Prisma scaffold | **Done** |
 | **2** | OpenAPI engine | parsing, validation, comparison, classification, tests, clean engine interface | **Done** |
-| **3** | Backend + database | Prisma models, migrations, `/api/v1`, persistence, real frontend integration | **In review** |
-| **4** | Source analysis | AST matching, secure ZIP pipeline, real GitHub integration, evidence | Planned |
+| **3** | Backend + database | Prisma models, migrations, `/api/v1`, persistence, real frontend integration | **Done** |
+| **4** | Source analysis | AST matching, secure ZIP pipeline, real GitHub integration, evidence | **In review** |
 | **5** | Impact graph + UI | evidence-backed graph, filterable findings, accessible views | Planned |
 | **6** | Reports + history | saved history, JSON/readable exports, regression suggestions | Planned |
 | **7** | Auth + security + deploy | sessions, authorization, IDOR tests, hardening, release checklist | Planned |
@@ -123,6 +123,58 @@ limitations.
 
 See `docs/api.md` for the endpoint reference.
 
+## Phase 4 decisions (this phase)
+
+- **Separate source package:** `packages/source-analysis` owns TypeScript AST
+  parsing, call detection, path matching, and evidence generation. The API layer
+  only handles input transport (ZIP/GitHub), persistence, and HTTP errors.
+- **Parser:** the TypeScript compiler API is used at runtime. It is already a
+  repository dependency, handles TS/TSX/JS/JSX without executing code, and is
+  error-tolerant for partially invalid files.
+- **Conservative detection:** only calls with a statically resolvable method and
+  path are reported. Supported shapes are `fetch`, Axios member/config calls,
+  API-client member calls, and request helpers. A detected call is only returned
+  when it matches an operation changed by an existing comparison, which keeps
+  heuristic false positives out of the results.
+- **Matching:** exact normalized path matches are `high` confidence; shared
+  API-prefix suffix matches are `medium`; template-literal paths with
+  interpolations are capped at `medium`. OpenAPI `{param}`, Express `:param`,
+  and template `{}` segments are treated as single-segment wildcards.
+- **ZIP security:** uploads are held in memory (never extracted to disk), checked
+  for ZIP magic, bounded by compressed size (10 MiB), entry count (5,000),
+  source files (2,000), total uncompressed size (25 MiB), and per-file size
+  (1 MiB). Absolute paths, drive letters, null bytes, empty segments, and `..`
+  traversal are rejected. Only UTF-8 TS/JS files are read. The analyzer also
+  enforces a 20-second wall-clock budget.
+- **GitHub integration:** server-side `GITHUB_TOKEN` (GitHub App installation
+  token or fine-grained PAT with read-only Contents permission). The API uses the
+  official REST API to resolve the ref, read the recursive tree, and fetch
+  bounded blobs with a 15-second per-request timeout and a 60-second overall
+  budget. It never clones or executes repository code. Without a token it
+  returns `503 github_not_configured`; it never fakes a connection.
+- **Persistence:** `SourceSnapshot`, `SourceFile`, and `SourceImpact` store
+  analysis metadata, scanned/skipped file paths, and ordered evidence snippets.
+  Full source contents are not persisted.
+- **Frontend:** the `/contracts` workspace gains a source-impact panel after a
+  comparison, with ZIP upload, GitHub repository analysis (disabled honestly when
+  the server has no token), evidence grouped by file, limitations, and snapshot
+  history.
+- **Migration:** generated with `prisma migrate diff --from-schema-datasource`
+  and applied with `prisma migrate deploy`, because the managed database has no
+  shadow database.
+
+See `docs/source-analysis.md` and `docs/api.md` for details.
+
+## Non-goals for Phase 4
+
+- OAuth login or per-user GitHub App installation flows (deferred to Phase 7
+  with authentication/session handling).
+- Impact graph construction and interactive visualization (Phase 5).
+- Report exports and regression-test suggestions (Phase 6).
+- Runtime/dynamic URL resolution, code execution, dependency installation, or
+  repository cloning.
+- Background queues, per-user rate limits, or analysis caching.
+
 ## Non-goals for Phase 3
 
 - Authentication/authorization and per-user ownership.
@@ -167,5 +219,12 @@ See `docs/api.md` for the endpoint reference.
 - **External references:** uploaded contracts may contain external `$ref`s.
   They are never fetched; changes involving them are `unknown`, not silently
   assumed safe.
+- **Static source analysis:** dynamic URLs, custom wrappers, generated clients,
+  GraphQL/WebSockets, and runtime composition are out of scope. Results are
+  evidence-backed matches, not a guarantee of complete impact discovery.
+- **GitHub credential scope:** Phase 4 uses one server-side `GITHUB_TOKEN`
+  (installation token or fine-grained PAT). Per-user OAuth/App installation and
+  token storage require the authentication/session work in Phase 7. Rotate the
+  token if it is ever exposed; it must never be logged or returned to clients.
 - **YAML resource exhaustion:** alias bombs and circular aliases are bounded or
   rejected. Keep these limits when adding alternate parsers.

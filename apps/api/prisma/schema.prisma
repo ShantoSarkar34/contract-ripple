@@ -21,13 +21,14 @@ enum AnalysisStatus {
 }
 
 model Project {
-  id           String        @id @default(cuid())
-  name         String
-  description  String?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  contracts    Contract[]
-  analysisRuns AnalysisRun[]
+  id              String           @id @default(cuid())
+  name            String
+  description     String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  contracts       Contract[]
+  analysisRuns    AnalysisRun[]
+  sourceSnapshots SourceSnapshot[]
 }
 
 model Contract {
@@ -83,6 +84,7 @@ model AnalysisRun {
   candidateSummary         Json?
   createdAt                DateTime        @default(now())
   findings                 Finding[]
+  sourceSnapshots          SourceSnapshot[]
 
   @@index([projectId])
   @@index([createdAt])
@@ -110,4 +112,62 @@ model Finding {
   @@unique([analysisRunId, engineId])
   @@index([analysisRunId])
   @@index([risk])
+}
+
+model SourceSnapshot {
+  id            String         @id @default(cuid())
+  projectId     String
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  analysisRunId String?
+  analysisRun   AnalysisRun?   @relation(fields: [analysisRunId], references: [id], onDelete: SetNull)
+  sourceType    String
+  repository    String?
+  ref           String?
+  fileCount     Int
+  skippedCount  Int
+  totalBytes    Int
+  limitations   Json?
+  createdAt     DateTime       @default(now())
+  files         SourceFile[]
+  impacts       SourceImpact[]
+
+  @@index([projectId])
+  @@index([analysisRunId])
+  @@index([createdAt])
+}
+
+model SourceFile {
+  id         String         @id @default(cuid())
+  snapshotId String
+  snapshot   SourceSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  path       String
+  bytes      Int
+  skipped    Boolean        @default(false)
+  reason     String?
+  createdAt  DateTime       @default(now())
+
+  @@index([snapshotId])
+}
+
+model SourceImpact {
+  id            String         @id @default(cuid())
+  snapshotId    String
+  snapshot      SourceSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  position      Int
+  filePath      String
+  line          Int
+  column        Int
+  snippet       String
+  call          String
+  method        String
+  path          String
+  matchedMethod String
+  matchedPath   String
+  operationId   String?
+  confidence    String
+  evidence      String
+  createdAt     DateTime       @default(now())
+
+  @@index([snapshotId])
+  @@index([filePath])
 }

@@ -6,15 +6,22 @@ import type {
   Prisma,
   PrismaClient,
   Project as ProjectRow,
+  SourceFile as SourceFileRow,
+  SourceImpact as SourceImpactRow,
+  SourceSnapshot as SourceSnapshotRow,
 } from "@prisma/client";
 import {
   CHANGE_TYPES,
   FINDING_CATEGORIES,
   RISK_LEVELS,
+  SOURCE_CONFIDENCES,
+  SOURCE_TYPES,
   type ChangeType,
   type ContractFormat,
   type FindingCategory,
   type RiskLevel,
+  type SourceConfidence,
+  type SourceType,
 } from "@contract-ripple/shared";
 import { toContractSummary, toStringArray } from "./json.js";
 import type {
@@ -29,10 +36,16 @@ import type {
   CreateContractInput,
   CreateContractVersionInput,
   CreateProjectInput,
+  CreateSourceSnapshotInput,
   FindingRecord,
   ProjectRecord,
   ProjectRecordWithCount,
   Repository,
+  SourceFileRecord,
+  SourceImpactRecord,
+  SourceSnapshotDetailRecord,
+  SourceSnapshotRecord,
+  SourceSnapshotWithCount,
   UpdateProjectInput,
 } from "./types.js";
 
@@ -47,10 +60,15 @@ type AnalysisRowDetail = AnalysisRunRow & {
   candidateVersion: ContractVersionRow & { contract: ContractRow };
   findings: FindingRow[];
 };
+type SourceSnapshotRowWithCount = SourceSnapshotRow & { _count: { impacts: number } };
+type SourceSnapshotRowDetail = SourceSnapshotRow & {
+  files: SourceFileRow[];
+  impacts: SourceImpactRow[];
+};
 
 function assertOneOf<T extends string>(value: string, allowed: readonly T[], field: string): T {
   if (!(allowed as readonly string[]).includes(value)) {
-    throw new Error(`Stored finding ${field} value is not recognised.`);
+    throw new Error(`Stored ${field} value is not recognised.`);
   }
   return value as T;
 }
@@ -156,6 +174,59 @@ function toSummaryJson(summary: {
     title: summary.title ?? null,
     version: summary.version ?? null,
     warnings: summary.warnings,
+  };
+}
+
+function mapSourceFile(row: SourceFileRow): SourceFileRecord {
+  return {
+    id: row.id,
+    snapshotId: row.snapshotId,
+    path: row.path,
+    bytes: row.bytes,
+    skipped: row.skipped,
+    reason: row.reason,
+    createdAt: row.createdAt,
+  };
+}
+
+function mapSourceImpact(row: SourceImpactRow): SourceImpactRecord {
+  return {
+    id: row.id,
+    snapshotId: row.snapshotId,
+    position: row.position,
+    filePath: row.filePath,
+    line: row.line,
+    column: row.column,
+    snippet: row.snippet,
+    call: row.call,
+    method: row.method,
+    path: row.path,
+    matchedMethod: row.matchedMethod,
+    matchedPath: row.matchedPath,
+    operationId: row.operationId,
+    confidence: assertOneOf(
+      row.confidence,
+      SOURCE_CONFIDENCES,
+      "source confidence",
+    ) as SourceConfidence,
+    evidence: row.evidence,
+    createdAt: row.createdAt,
+  };
+}
+
+function mapSourceSnapshot(row: SourceSnapshotRow): SourceSnapshotRecord {
+  return {
+    id: row.id,
+    projectId: row.projectId,
+    analysisRunId: row.analysisRunId,
+    sourceType: assertOneOf(row.sourceType, SOURCE_TYPES, "source type") as SourceType,
+    repository: row.repository,
+    ref: row.ref,
+    fileCount: row.fileCount,
+    skippedCount: row.skippedCount,
+    totalBytes: row.totalBytes,
+    limitations: toStringArray(row.limitations),
+    createdAt: row.createdAt,
   };
 }
 
@@ -344,6 +415,81 @@ export class PrismaRepository implements Repository {
       ...mapAnalysisRun(row),
       baselineVersion: mapVersion(row.baselineVersion),
       candidateVersion: mapVersion(row.candidateVersion),
+    }));
+  }
+
+  async createSourceSnapshot(input: CreateSourceSnapshotInput): Promise<SourceSnapshotRecord> {
+    const row = await this.prisma.sourceSnapshot.create({
+      data: {
+        projectId: input.projectId,
+        analysisRunId: input.analysisRunId ?? null,
+        sourceType: input.sourceType,
+        repository: input.repository ?? null,
+        ref: input.ref ?? null,
+        fileCount: input.fileCount,
+        skippedCount: input.skippedCount,
+        totalBytes: input.totalBytes,
+        limitations: input.limitations,
+        files: {
+          create: input.files.map((file) => ({
+            path: file.path,
+            bytes: file.bytes,
+            skipped: file.skipped,
+            reason: file.reason ?? null,
+          })),
+        },
+        impacts: {
+          create: input.impacts.map((impact, position) => ({
+            position,
+            filePath: impact.filePath,
+            line: impact.line,
+            column: impact.column,
+            snippet: impact.snippet,
+            call: impact.call,
+            method: impact.method,
+            path: impact.path,
+            matchedMethod: impact.matchedMethod,
+            matchedPath: impact.matchedPath,
+            operationId: impact.operationId ?? null,
+            confidence: impact.confidence,
+            evidence: impact.evidence,
+          })),
+        },
+      },
+    });
+    return mapSourceSnapshot(row);
+  }
+
+  async getSourceSnapshot(id: string): Promise<SourceSnapshotDetailRecord | null> {
+    const row = (await this.prisma.sourceSnapshot.findUnique({
+      where: { id },
+      include: {
+        files: { orderBy: { path: "asc" } },
+        impacts: { orderBy: { position: "asc" } },
+      },
+    })) as SourceSnapshotRowDetail | null;
+
+    if (!row) {
+      return null;
+    }
+
+    return {
+      ...mapSourceSnapshot(row),
+      files: row.files.map(mapSourceFile),
+      impacts: row.impacts.map(mapSourceImpact),
+    };
+  }
+
+  async listSourceSnapshotsByProject(projectId: string): Promise<SourceSnapshotWithCount[]> {
+    const rows = (await this.prisma.sourceSnapshot.findMany({
+      where: { projectId },
+      orderBy: { createdAt: "desc" },
+      include: { _count: { select: { impacts: true } } },
+    })) as SourceSnapshotRowWithCount[];
+
+    return rows.map((row) => ({
+      ...mapSourceSnapshot(row),
+      impactCount: row._count.impacts,
     }));
   }
 }

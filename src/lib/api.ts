@@ -8,13 +8,18 @@ import type {
   CreateComparisonRequest,
   CreateContractRequest,
   CreateContractVersionRequest,
+  CreateGithubSourceRequest,
   CreateProjectRequest,
+  GitHubStatusResponse,
   ListAnalysesResponse,
   ListContractsResponse,
   ListProjectsResponse,
+  ListSourceSnapshotsResponse,
   ListVersionsResponse,
   ProjectDto,
   ReadyResponse,
+  SourceSnapshotDetailDto,
+  SourceSnapshotDto,
   UpdateProjectRequest,
 } from "@contract-ripple/shared";
 
@@ -86,11 +91,17 @@ export function describeErrorDetails(error: ApiRequestError): string[] {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const isFormData = typeof FormData !== "undefined" && init?.body instanceof FormData;
+  const headers = new Headers(init?.headers);
+  if (!isFormData && !headers.has("content-type")) {
+    headers.set("content-type", "application/json");
+  }
+
   let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       ...init,
-      headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
+      headers,
     });
   } catch {
     throw new ApiRequestError(
@@ -203,6 +214,53 @@ export const api = {
   getComparison(comparisonId: string): Promise<AnalysisRunDetailDto> {
     return request<AnalysisRunDetailDto>(`/comparisons/${id(comparisonId)}`);
   },
+
+  getGitHubStatus(): Promise<GitHubStatusResponse> {
+    return request<GitHubStatusResponse>("/github/status");
+  },
+
+  listSourceSnapshots(projectId: string): Promise<ListSourceSnapshotsResponse> {
+    return request<ListSourceSnapshotsResponse>(`/projects/${id(projectId)}/source`);
+  },
+
+  getSourceSnapshot(snapshotId: string): Promise<SourceSnapshotDetailDto> {
+    return request<SourceSnapshotDetailDto>(`/source/${id(snapshotId)}`);
+  },
+
+  analyzeZipSource(
+    projectId: string,
+    archive: File | Blob,
+    options: { analysisRunId?: string } = {},
+  ): Promise<SourceSnapshotDetailDto> {
+    const form = new FormData();
+    const filename = typeof File !== "undefined" && archive instanceof File ? archive.name : "source.zip";
+    form.append("archive", archive, filename);
+    if (options.analysisRunId) {
+      form.append("analysisRunId", options.analysisRunId);
+    }
+    return request<SourceSnapshotDetailDto>(`/projects/${id(projectId)}/source/zip`, {
+      method: "POST",
+      body: form,
+    });
+  },
+
+  analyzeGithubSource(
+    projectId: string,
+    input: CreateGithubSourceRequest,
+  ): Promise<SourceSnapshotDetailDto> {
+    return request<SourceSnapshotDetailDto>(`/projects/${id(projectId)}/source/github`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  },
 };
 
-export type { AnalysisRunDetailDto, AnalysisRunDto, ContractDto, ContractVersionDto, ProjectDto };
+export type {
+  AnalysisRunDetailDto,
+  AnalysisRunDto,
+  ContractDto,
+  ContractVersionDto,
+  ProjectDto,
+  SourceSnapshotDetailDto,
+  SourceSnapshotDto,
+};

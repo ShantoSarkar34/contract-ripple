@@ -1,10 +1,16 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { config as loadDotenv } from "dotenv";
+import { strToU8, zipSync } from "fflate";
 import type { PrismaClient } from "@prisma/client";
 import { PrismaRepository } from "./prisma-repository.js";
 import { createProject } from "../services/projects.js";
 import { createContract, createContractVersion } from "../services/contracts.js";
 import { createComparison, getComparison, listComparisons } from "../services/comparisons.js";
+import {
+  analyzeZipSource,
+  getSourceSnapshot,
+  listSourceSnapshots,
+} from "../services/source.js";
 import { baselinePetJson, candidatePetJson } from "../testing/fixtures.js";
 
 // The API's .env lives two directories above this file (apps/api/.env).
@@ -81,5 +87,25 @@ describe.skipIf(!shouldRun)("PrismaRepository (integration)", () => {
     const projects = await repository.listProjects();
     const storedProject = projects.find((entry) => entry.id === project.id);
     expect(storedProject?.contractCount).toBe(1);
-  });
+
+    const archive = zipSync({
+      "src/client.ts": strToU8(`
+        fetch("/pets", { method: "POST" });
+        axios.get("/pets");
+      `),
+    });
+    const snapshot = await analyzeZipSource(repository, project.id, archive, {
+      analysisRunId: created.id,
+    });
+    expect(snapshot.impactCount).toBe(2);
+    expect(snapshot.files).toHaveLength(1);
+
+    const storedSnapshot = await getSourceSnapshot(repository, snapshot.id);
+    expect(storedSnapshot.impacts.map((impact) => impact.evidence)).toEqual(
+      snapshot.impacts.map((impact) => impact.evidence),
+    );
+
+    const snapshots = await listSourceSnapshots(repository, project.id);
+    expect(snapshots.snapshots.map((entry) => entry.id)).toContain(snapshot.id);
+  }, 30_000);
 });

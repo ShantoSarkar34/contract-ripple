@@ -4,6 +4,8 @@ import type {
   ContractFormat,
   FindingCategory,
   RiskLevel,
+  SourceConfidence,
+  SourceType,
 } from "@contract-ripple/shared";
 
 /** A contract summary as produced by the engine and stored with an analysis run. */
@@ -160,6 +162,92 @@ export type CreateAnalysisRunInput = {
   findings: CreateFindingInput[];
 };
 
+export type SourceFileRecord = {
+  id: string;
+  snapshotId: string;
+  path: string;
+  bytes: number;
+  skipped: boolean;
+  reason: string | null;
+  createdAt: Date;
+};
+
+export type SourceImpactRecord = {
+  id: string;
+  snapshotId: string;
+  position: number;
+  filePath: string;
+  line: number;
+  column: number;
+  snippet: string;
+  call: string;
+  method: string;
+  path: string;
+  matchedMethod: string;
+  matchedPath: string;
+  operationId: string | null;
+  confidence: SourceConfidence;
+  evidence: string;
+  createdAt: Date;
+};
+
+export type SourceSnapshotRecord = {
+  id: string;
+  projectId: string;
+  analysisRunId: string | null;
+  sourceType: SourceType;
+  repository: string | null;
+  ref: string | null;
+  fileCount: number;
+  skippedCount: number;
+  totalBytes: number;
+  limitations: string[];
+  createdAt: Date;
+};
+
+export type SourceSnapshotWithCount = SourceSnapshotRecord & { impactCount: number };
+
+export type SourceSnapshotDetailRecord = SourceSnapshotRecord & {
+  files: SourceFileRecord[];
+  impacts: SourceImpactRecord[];
+};
+
+export type CreateSourceFileInput = {
+  path: string;
+  bytes: number;
+  skipped: boolean;
+  reason?: string;
+};
+
+export type CreateSourceImpactInput = {
+  filePath: string;
+  line: number;
+  column: number;
+  snippet: string;
+  call: string;
+  method: string;
+  path: string;
+  matchedMethod: string;
+  matchedPath: string;
+  operationId?: string;
+  confidence: SourceConfidence;
+  evidence: string;
+};
+
+export type CreateSourceSnapshotInput = {
+  projectId: string;
+  analysisRunId?: string;
+  sourceType: SourceType;
+  repository?: string;
+  ref?: string;
+  fileCount: number;
+  skippedCount: number;
+  totalBytes: number;
+  limitations: string[];
+  files: CreateSourceFileInput[];
+  impacts: CreateSourceImpactInput[];
+};
+
 /**
  * Persistence boundary for the API. Services depend on this interface so they
  * can be tested with an in-memory implementation and later swapped or wrapped
@@ -184,4 +272,8 @@ export interface Repository {
   createAnalysisRun(input: CreateAnalysisRunInput): Promise<AnalysisRunRecord>;
   getAnalysisRun(id: string): Promise<AnalysisRunDetailRecord | null>;
   listAnalysisRunsByProject(projectId: string): Promise<AnalysisRunWithVersions[]>;
+
+  createSourceSnapshot(input: CreateSourceSnapshotInput): Promise<SourceSnapshotRecord>;
+  getSourceSnapshot(id: string): Promise<SourceSnapshotDetailRecord | null>;
+  listSourceSnapshotsByProject(projectId: string): Promise<SourceSnapshotWithCount[]>;
 }
