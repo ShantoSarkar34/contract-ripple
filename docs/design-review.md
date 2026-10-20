@@ -3,6 +3,34 @@
 This document records specific improvements to the existing UI. **No redesign is performed in
 Phase 1.** These are recommendations for Phases 3 and 5, prioritized by impact.
 
+## Phase 5 resolution
+
+Phase 5 addressed the application-shell, density, accessibility, typography, and theming
+recommendations:
+
+- **Application shell:** the workspace now has a sticky context bar showing the selected project,
+  contract, and anchors to the comparison report and impact map. The navbar no longer exposes dead
+  `/impact`, `/history`, or `/signup` routes and includes a keyboard-operable mobile menu.
+- **Typography:** the Geist font variables loaded by `layout.tsx` are applied to the body, and
+  monospace is used for code paths and evidence.
+- **Information density:** comparison findings are a dense, filterable table (risk, category,
+  method, search) with expandable explanation/evidence rows and incremental "Show more".
+- **Graph with fallback:** the impact map is a deterministic SVG. A Map/Relationships toggle exposes
+  the same evidence as a semantic table for keyboard and screen-reader users, and operations without
+  a persisted source match remain visible.
+- **Accessibility:** global `:focus-visible` outlines cover links, buttons, and summaries; tables
+  have captions; risk uses text as well as color; decorative feature emoji are hidden; reduced-motion
+  preferences are respected.
+- **Color and theming:** Tailwind now uses `darkMode: "media"`, matching the `prefers-color-scheme`
+  CSS variables instead of the previous inactive class strategy. Background/foreground tokens are
+  wired through RGB variables so alpha utilities work.
+- **States:** the graph and table show explicit empty, filtered, unmatched, truncation, and
+  static-analysis limitation text.
+
+Remaining, deferred to later phases: sortable table columns, a sticky table header, history
+pagination, report/export views (Phase 6), and authentication-aware UI (Phase 7). A manual theme
+toggle is not required while the app follows the operating-system preference.
+
 ## Current UI inventory
 
 - `navbar.tsx` — sticky navigation, brand mark, four links, sign-in/get-started actions.

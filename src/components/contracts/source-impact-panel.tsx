@@ -8,16 +8,11 @@ import type {
   SourceSnapshotDto,
 } from "@contract-ripple/shared";
 import { ApiRequestError, api, describeErrorDetails } from "@/lib/api";
-import { methodClass } from "@/lib/findings";
+import { CONFIDENCE_CLASSES, CONFIDENCE_LABELS, displayPath, methodClass } from "@/lib/findings";
+import ImpactGraph from "./impact-graph";
 
 /** Local mirror of the server limit; keep the shared package out of the client bundle. */
 const MAX_ARCHIVE_BYTES = 10 * 1024 * 1024;
-
-const CONFIDENCE_CLASSES: Record<string, string> = {
-  high: "text-success",
-  medium: "text-warning",
-  low: "text-slate-500 dark:text-slate-400",
-};
 
 type LoadState = "idle" | "loading" | "ready" | "error";
 type PanelError = { message: string; details: string[] };
@@ -85,10 +80,10 @@ function ImpactRow({ impact }: { impact: SourceImpactDto }) {
         </span>
         <span
           className={`ml-auto text-xs font-semibold ${
-            CONFIDENCE_CLASSES[impact.confidence] ?? CONFIDENCE_CLASSES.low
+            CONFIDENCE_CLASSES[impact.confidence]
           }`}
         >
-          {impact.confidence} confidence
+          {CONFIDENCE_LABELS[impact.confidence]} confidence
         </span>
       </div>
 
@@ -251,7 +246,7 @@ export default function SourceImpactPanel({
   }
 
   return (
-    <section className="card p-4">
+    <section id="impact-map" className="card scroll-mt-24 p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
@@ -402,6 +397,8 @@ export default function SourceImpactPanel({
               </div>
             </dl>
 
+            <ImpactGraph analysis={analysis} snapshot={active} />
+
             {active.impacts.length === 0 ? (
               <p className="rounded-md border border-warning/30 bg-warning-light p-3 text-sm text-warning">
                 No affected API calls were found in the scanned files. The static analyzer only
@@ -409,20 +406,23 @@ export default function SourceImpactPanel({
                 custom wrappers, and generated clients may still be affected.
               </p>
             ) : (
-              <ul className="space-y-4">
-                {[...groupedImpacts.entries()].map(([filePath, impacts]) => (
-                  <li key={filePath}>
-                    <p className="mb-2 break-all font-mono text-sm font-semibold text-foreground">
-                      {filePath}
-                    </p>
-                    <ul className="space-y-2">
-                      {impacts.map((impact) => (
-                        <ImpactRow key={impact.id} impact={impact} />
-                      ))}
-                    </ul>
-                  </li>
-                ))}
-              </ul>
+              <div>
+                <h4 className="mb-2 text-sm font-semibold text-foreground">Evidence by file</h4>
+                <ul className="space-y-4">
+                  {[...groupedImpacts.entries()].map(([filePath, impacts]) => (
+                    <li key={filePath}>
+                      <p className="mb-2 break-all font-mono text-sm font-semibold text-foreground">
+                        {displayPath(filePath)}
+                      </p>
+                      <ul className="space-y-2">
+                        {impacts.map((impact) => (
+                          <ImpactRow key={impact.id} impact={impact} />
+                        ))}
+                      </ul>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
 
             {active.limitations.length > 0 ? (
