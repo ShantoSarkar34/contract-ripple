@@ -180,7 +180,7 @@ Recorded so future phases start from verified facts. Update this section only wh
 
 - **Repository root:** `contract-ripple` (the workspace parent `contract-ripple-full-project` is not currently a git repository).
 - **Remote:** `https://github.com/ShantoSarkar34/contract-ripple.git`, branch `main`.
-- **Deployment:** frontend deployed at `contractripple.vercel.app` (Vercel project `contractripple`, root `.`); API deployed at `contractripple-api.vercel.app/api/v1` (Vercel project `contractripple-api`, root `apps/api`); both use managed PostgreSQL. See `docs/deployment.md`.
+- **Deployment:** frontend deployed at `contractripple.vercel.app` (Vercel project `contractripple`, root `.`); API deployed at `contractripple-api.vercel.app/api/v1` (Vercel project `contractripple-api`, root `apps/api`, GitHub production branch `main`); both use managed PostgreSQL. See `docs/deployment.md`.
 - **Package manager:** npm with workspaces (`apps/*`, `packages/*`); `package-lock.json` is the single lockfile. Do not introduce a second lockfile without approval.
 - **Frontend:** Next.js `16.4.2`, React `19.3.0`, TypeScript `^5`, Tailwind CSS `3.4.19`, ESLint `9` with `eslint-config-next`.
 - **App structure:** App Router under `src/app`; UI components under `src/components`; client API helper under `src/lib`; path alias `@/* -> ./src/*`. The `/contracts` route is a real client workspace with a dense, filterable comparison table, source-impact panel, and an evidence-backed impact map with Map/Relationships views; `/` remains labeled demo content. Tailwind uses `darkMode: "media"` to match the `prefers-color-scheme` CSS variables.

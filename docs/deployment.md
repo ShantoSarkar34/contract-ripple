@@ -92,8 +92,8 @@ https://contractripple-api.vercel.app/api/v1/ready
 
 ## Git-based deployments
 
-To make future `main` pushes deploy the API automatically, connect
-`contractripple-api` to the GitHub repository in Vercel and set:
+`contractripple-api` is connected to the GitHub repository
+`ShantoSarkar34/contract-ripple`. Its current settings are:
 
 - **Root Directory:** `apps/api`
 - **Include source files outside of the Root Directory:** enabled
@@ -101,7 +101,9 @@ To make future `main` pushes deploy the API automatically, connect
 - **Framework Preset:** Express
 
 The build command comes from `apps/api/vercel.json`. Do not run Prisma
-migrations during the build or at server startup.
+migrations during the build or at server startup. Pushes to `open-branch` may
+create preview deployments, but only Production has `DATABASE_URL` and
+`CORS_ORIGINS`; preview API deployments are not expected to be ready.
 
 The frontend project keeps **Root Directory** at `.` and deploys from `main`.
 Do not deploy the local `open-branch` working tree to the production frontend;
@@ -169,8 +171,10 @@ access-control boundary.
 
 - `GITHUB_TOKEN` is not configured in production yet, so GitHub source analysis
   reports `github_not_configured`.
-- The API Vercel project is currently deployed from the CLI. Git-based automatic
-  deployments require the GitHub connection described above.
+- The API Vercel project is connected to GitHub and deploys production from
+  `main`. The current live API was deployed from the CLI from `open-branch`
+  before that branch was merged; it contains only deployment changes plus the
+  same API behavior as `main`.
 - The frontend production deployment still corresponds to `main`. Phase 5 work
   on `open-branch` becomes live only after the user merges and Vercel redeploys.
 - Vercel's 4.5 MB request limit is lower than the application's documented
