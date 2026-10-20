@@ -1,0 +1,4 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm --prefix ../.. run db:generate && npm --prefix ../.. run build:api"
+}

@@ -264,10 +264,18 @@ source archive, reads the snapshot back, and deletes the project at the end.
 
 ## Deployment
 
-- **Frontend:** Vercel at the repository root (current live site: `contractripple.vercel.app`).
-- **Backend:** deploy `apps/api` separately to a Node-capable host with PostgreSQL.
-- Set environment variables per environment; use HTTPS and explicit CORS origins.
-- Run Prisma migrations deliberately, never automatically on server start.
+- **Frontend:** Vercel project `contractripple`, rooted at the repository root
+  (current live site: `contractripple.vercel.app`).
+- **Backend:** Vercel project `contractripple-api`, rooted at `apps/api`
+  (current live API: `contractripple-api.vercel.app/api/v1`).
+- **Database:** managed PostgreSQL; migrations are run deliberately with
+  `npm run db:deploy`, never automatically on server start.
+- Set `NEXT_PUBLIC_API_BASE_URL` on the frontend, and `DATABASE_URL`,
+  `CORS_ORIGINS`, and the optional `GITHUB_TOKEN` on the API. Use HTTPS and
+  exact CORS origins.
+- Vercel Functions limit request bodies to 4.5 MB, below the application's
+  10 MiB ZIP limit. See `docs/deployment.md` for the full deployment topology,
+  CLI commands, limits, and security status.
 
 ## Documentation
 
@@ -278,6 +286,7 @@ source archive, reads the snapshot back, and deletes the project at the end.
 - `docs/engine.md` — OpenAPI engine interface, rules, and limitations.
 - `docs/source-analysis.md` — source detection, matching, ZIP/GitHub security, and limits.
 - `docs/impact-graph.md` — graph model, construction rules, limits, accessibility, and library evaluation.
+- `docs/deployment.md` — Vercel frontend/API topology, environment variables, limits, and security status.
 - `docs/design-review.md` — UI review and improvement priorities.
 
 ## Demo data
