@@ -5,11 +5,12 @@ potential impact on frontend integrations. It compares OpenAPI specifications, c
 potentially breaking changes, and (in later phases) analyzes frontend source code to surface
 evidence-backed impact.
 
-> **Status:** Phase 3. The OpenAPI engine is wired to an Express API with
-> PostgreSQL persistence, and the `/contracts` workspace runs real comparisons
-> and shows classified findings with JSON Pointer evidence. The landing page
-> (`/`) still renders clearly labeled demo content. Source analysis, the impact
-> graph, reports, and authentication are not implemented yet.
+> **Status:** Phase 4. The OpenAPI engine is wired to an Express API with
+> PostgreSQL persistence, and the `/contracts` workspace runs real comparisons,
+> shows classified findings with JSON Pointer evidence, and analyzes ZIP/GitHub
+> source for affected integrations with file/line evidence. The landing page
+> (`/`) still renders clearly labeled demo content. The impact graph, reports,
+> and authentication are not implemented yet.
 
 ## Stack
 
@@ -18,6 +19,7 @@ evidence-backed impact.
 - **Database:** PostgreSQL via Prisma (`apps/api/prisma`).
 - **Shared:** framework-agnostic types (`packages/shared`).
 - **Engine:** standalone OpenAPI comparison engine (`packages/engine`).
+- **Source analysis:** TypeScript AST matching (`packages/source-analysis`).
 - **Package manager:** npm (workspaces). Commit `package-lock.json`; do not introduce a second lockfile.
 
 ## Repository layout
@@ -34,8 +36,9 @@ contract-ripple/            # git repo root (frontend + workspaces)
 │       └── prisma/         # schema + migrations
 ├── packages/
 │   ├── engine/             # OpenAPI parse/validate/normalize/compare/classify
+│   ├── source-analysis/    # TypeScript AST call detection + operation matching
 │   └── shared/             # shared types and zod request schemas
-├── docs/                   # plan, architecture, design review, engine/API docs
+├── docs/                   # plan, architecture, design review, engine/API/source docs
 ├── AGENTS.md               # permanent project instructions
 └── .env.example
 ```
@@ -89,15 +92,16 @@ npm run api:dev
 | `npm run build` | Build shared, then production-build the frontend (Webpack) |
 | `npm run start` | Start the production frontend |
 | `npm run lint` | ESLint on the frontend source |
-| `npm run typecheck` | Build shared + engine, type-check the frontend, type-check the API |
+| `npm run typecheck` | Build shared + engine + source-analysis, type-check the frontend, type-check the API |
 | `npm test` | Run unit tests with Vitest (DB integration test skipped) |
 | `npm run test:watch` | Vitest watch mode |
-| `npm run api:dev` | Start the Express API in watch mode (loads `apps/api/.env`) |
+| `npm run api:dev` | Build shared/engine/source-analysis, then start the Express API in watch mode (loads `apps/api/.env`) |
 | `npm run api:start` | Start the compiled API |
 | `npm run build:shared` | Build the shared types package |
 | `npm run build:engine` | Build the OpenAPI engine |
-| `npm run build:api` | Build shared + engine + API |
-| `npm run build:all` | Build frontend + shared + engine + API |
+| `npm run build:source` | Build the source-analysis package |
+| `npm run build:api` | Build shared + engine + source-analysis + API |
+| `npm run build:all` | Build frontend + shared + engine + source-analysis + API |
 | `npm run db:validate` | Validate the Prisma schema |
 | `npm run db:generate` | Generate the Prisma client |
 | `npm run db:migrate` | Create/apply a dev migration (`prisma migrate dev`) |
@@ -124,6 +128,28 @@ deterministic findings with JSON Pointers, explanations, and
 See `docs/engine.md` for classification rules, security limits, library
 evaluation, and known limitations.
 
+## Source analysis
+
+After a comparison, the `/contracts` workspace can analyze frontend source
+against the operations that changed. Two inputs are supported:
+
+- **ZIP upload** — up to 10 MiB, analyzed in memory. Path traversal, oversized
+  entries, and unsupported files are rejected or skipped.
+- **GitHub repository** — requires `GITHUB_TOKEN` on the API server. The server
+  uses the official REST API to read the selected ref; it never clones or
+  executes repository code.
+
+`packages/source-analysis` parses TypeScript/JavaScript with the TypeScript
+compiler API and detects statically resolvable calls (`fetch`, Axios,
+API-client wrappers, request helpers, template-literal paths). Detected calls
+are matched only against operations changed by the comparison. Each result
+includes file, line, column, snippet, matched operation, and confidence.
+
+Static analysis cannot see runtime-composed URLs, custom wrappers that hide
+method and path, generated clients, or GraphQL/WebSocket traffic. Results are
+evidence-backed matches, not a guarantee of complete impact discovery. See
+`docs/source-analysis.md`.
+
 ## Environment variables
 
 Frontend (`.env.local`, see `.env.example`):
@@ -140,8 +166,13 @@ Backend (`apps/api/.env`, see `apps/api/.env.example`):
 | `PORT` | API port (default `4000`) |
 | `CORS_ORIGINS` | Comma-separated allowed browser origins |
 | `DATABASE_URL` | PostgreSQL connection string (Phase 3+) |
+| `GITHUB_TOKEN` | Optional server-side GitHub App/PAT token with read-only Contents access |
+| `GITHUB_API_BASE_URL` | GitHub REST base URL (default `https://api.github.com`) |
 
 Never commit real `.env` files. `.gitignore` ignores them but allows `.env.example`.
+`GITHUB_TOKEN` is never returned by the API, written to logs, or included in
+error responses. Leave it empty to disable GitHub analysis; the API then reports
+`github_not_configured` instead of faking a connection.
 
 ## API (current)
 
@@ -158,6 +189,8 @@ Base URL `/api/v1`. All responses are JSON; errors use a consistent
   `GET /contracts/:contractId/versions`, `GET /versions/:versionId`
 - `POST /projects/:projectId/comparisons`, `GET /projects/:projectId/comparisons`,
   `GET /comparisons/:comparisonId`
+- `POST /projects/:projectId/source/zip` (multipart), `POST /projects/:projectId/source/github`,
+  `GET /projects/:projectId/source`, `GET /source/:snapshotId`, `GET /github/status`
 
 See `docs/api.md` for request/response fields, error codes, and limits.
 
@@ -170,8 +203,9 @@ Unit and route tests use Vitest and live next to the code they cover:
 
 - `packages/shared/src/*.test.ts` — error guards and API request schemas.
 - `packages/engine/src/*.test.ts` — parsing, validation, comparison, classification, security.
-- `apps/api/src/services/*.test.ts` — project/contract/comparison services with an in-memory repository.
-- `apps/api/src/routes/app.test.ts` — real HTTP requests against an ephemeral server.
+- `packages/source-analysis/src/*.test.ts` — AST call detection, path matching, template paths, limits.
+- `apps/api/src/services/*.test.ts` — project/contract/comparison/source services with an in-memory repository.
+- `apps/api/src/routes/app.test.ts`, `apps/api/src/routes/source.test.ts` — real HTTP requests against an ephemeral server.
 
 ```bash
 npm test
@@ -181,7 +215,8 @@ The engine tests cover parsing/validation failures, all required change classes,
 references, circular references, external references, deterministic ordering,
 JSON Pointer escaping, input limits, and security cases. The API tests cover
 input validation, engine error mapping, persistence DTOs, cross-project checks,
-and the full project → contract → version → comparison flow.
+ZIP traversal and size limits, GitHub error mapping, and the full project →
+contract → version → comparison → source-analysis flow.
 
 One PostgreSQL integration test is skipped by default. Run it against a
 configured `apps/api/.env` database with:
@@ -194,8 +229,8 @@ set RUN_DB_TESTS=1&& npx vitest run apps/api/src/db
 RUN_DB_TESTS=1 npx vitest run apps/api/src/db
 ```
 
-It creates a project, uploads two versions, runs a comparison, reads it back, and
-deletes the project at the end.
+It creates a project, uploads two versions, runs a comparison, analyzes a ZIP
+source archive, reads the snapshot back, and deletes the project at the end.
 
 ## Deployment
 
@@ -211,6 +246,7 @@ deletes the project at the end.
 - `docs/architecture.md` — boundaries and data flow.
 - `docs/api.md` — REST endpoint reference, error codes, and limits.
 - `docs/engine.md` — OpenAPI engine interface, rules, and limitations.
+- `docs/source-analysis.md` — source detection, matching, ZIP/GitHub security, and limits.
 - `docs/design-review.md` — UI review and improvement priorities.
 
 ## Demo data

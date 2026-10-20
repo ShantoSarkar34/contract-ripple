@@ -10,6 +10,7 @@ import type {
 } from "@contract-ripple/shared";
 import { API_BASE_URL, ApiRequestError, api, describeErrorDetails } from "@/lib/api";
 import ComparisonResults from "./comparison-results";
+import SourceImpactPanel from "./source-impact-panel";
 
 type LoadState = "idle" | "loading" | "ready" | "error";
 type SubmitError = { message: string; details: string[] };
@@ -847,6 +848,14 @@ export default function ContractsWorkspace() {
               </section>
 
               {analysis ? <ComparisonResults analysis={analysis} /> : null}
+
+              {analysis && selectedProjectId ? (
+                <SourceImpactPanel
+                  key={`${selectedProjectId}:${analysis.id}`}
+                  projectId={selectedProjectId}
+                  analysis={analysis}
+                />
+              ) : null}
             </>
           )}
         </main>

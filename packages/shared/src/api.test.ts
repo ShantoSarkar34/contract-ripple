@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
+  SOURCE_CONFIDENCES,
+  SOURCE_TYPES,
   createComparisonRequestSchema,
   createContractRequestSchema,
   createContractVersionRequestSchema,
+  createGithubSourceRequestSchema,
   createProjectRequestSchema,
+  githubSourceFieldsSchema,
   MAX_CONTRACT_BYTES,
+  MAX_SOURCE_ARCHIVE_BYTES,
   updateProjectRequestSchema,
   utf8ByteLength,
+  zipSourceFieldsSchema,
 } from "./api";
 
 describe("createProjectRequestSchema", () => {
@@ -92,5 +98,42 @@ describe("utf8ByteLength", () => {
     expect(utf8ByteLength("abc")).toBe(3);
     expect(utf8ByteLength("é")).toBe(2);
     expect(utf8ByteLength("😀")).toBe(4);
+  });
+});
+
+describe("source analysis schemas", () => {
+  it("exposes stable source enums and the archive limit", () => {
+    expect(SOURCE_TYPES).toEqual(["zip", "github"]);
+    expect(SOURCE_CONFIDENCES).toEqual(["high", "medium", "low"]);
+    expect(MAX_SOURCE_ARCHIVE_BYTES).toBe(10 * 1024 * 1024);
+  });
+
+  it("accepts GitHub source fields and trims values", () => {
+    const result = createGithubSourceRequestSchema.safeParse({
+      repository: "  octo/pets  ",
+      ref: "  main  ",
+      analysisRunId: "  run-1  ",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toEqual({
+        repository: "octo/pets",
+        ref: "main",
+        analysisRunId: "run-1",
+      });
+    }
+  });
+
+  it("requires a non-empty GitHub repository and bounds its length", () => {
+    expect(githubSourceFieldsSchema.safeParse({ repository: "   " }).success).toBe(false);
+    expect(
+      githubSourceFieldsSchema.safeParse({ repository: "x".repeat(301) }).success,
+    ).toBe(false);
+  });
+
+  it("accepts optional ZIP text fields", () => {
+    expect(zipSourceFieldsSchema.safeParse({}).success).toBe(true);
+    expect(zipSourceFieldsSchema.safeParse({ analysisRunId: "run-1" }).success).toBe(true);
+    expect(zipSourceFieldsSchema.safeParse({ analysisRunId: "" }).success).toBe(false);
   });
 });

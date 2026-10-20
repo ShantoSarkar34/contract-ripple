@@ -33,8 +33,17 @@ export type FindingCategory = (typeof FINDING_CATEGORIES)[number];
 export const ANALYSIS_STATUSES = ["completed", "failed"] as const;
 export type AnalysisStatus = (typeof ANALYSIS_STATUSES)[number];
 
+export const SOURCE_TYPES = ["zip", "github"] as const;
+export type SourceType = (typeof SOURCE_TYPES)[number];
+
+export const SOURCE_CONFIDENCES = ["high", "medium", "low"] as const;
+export type SourceConfidence = (typeof SOURCE_CONFIDENCES)[number];
+
 /** Engine input limits, mirrored from the engine defaults. */
 export const MAX_CONTRACT_BYTES = 5 * 1024 * 1024;
+
+/** Maximum ZIP upload accepted for source analysis. */
+export const MAX_SOURCE_ARCHIVE_BYTES = 10 * 1024 * 1024;
 
 /* -------------------------------------------------------------------------- */
 /* Request schemas                                                            */
@@ -80,6 +89,22 @@ export const createComparisonRequestSchema = z.object({
   label: z.string().trim().max(200).optional(),
 });
 export type CreateComparisonRequest = z.infer<typeof createComparisonRequestSchema>;
+
+export const githubSourceFieldsSchema = z.object({
+  repository: z.string().trim().min(1).max(300),
+  ref: z.string().trim().max(200).optional(),
+  analysisRunId: z.string().trim().min(1).optional(),
+});
+export type GitHubSourceFields = z.infer<typeof githubSourceFieldsSchema>;
+
+export const createGithubSourceRequestSchema = githubSourceFieldsSchema;
+export type CreateGithubSourceRequest = GitHubSourceFields;
+
+/** Text fields accepted alongside a multipart ZIP upload. */
+export const zipSourceFieldsSchema = z.object({
+  analysisRunId: z.string().trim().min(1).optional(),
+});
+export type ZipSourceFields = z.infer<typeof zipSourceFieldsSchema>;
 
 /* -------------------------------------------------------------------------- */
 /* Response DTOs                                                              */
@@ -186,6 +211,55 @@ export type ListProjectsResponse = { projects: ProjectDto[] };
 export type ListContractsResponse = { contracts: ContractDto[] };
 export type ListVersionsResponse = { versions: ContractVersionDto[] };
 export type ListAnalysesResponse = { analyses: AnalysisRunDto[] };
+
+export type SourceImpactDto = {
+  id: string;
+  filePath: string;
+  line: number;
+  column: number;
+  snippet: string;
+  call: string;
+  method: string;
+  path: string;
+  matchedMethod: string;
+  matchedPath: string;
+  operationId: string | null;
+  confidence: SourceConfidence;
+  evidence: string;
+};
+
+export type SourceFileDto = {
+  path: string;
+  bytes: number;
+  skipped: boolean;
+  reason: string | null;
+};
+
+export type SourceSnapshotDto = {
+  id: string;
+  projectId: string;
+  analysisRunId: string | null;
+  sourceType: SourceType;
+  repository: string | null;
+  ref: string | null;
+  fileCount: number;
+  skippedCount: number;
+  totalBytes: number;
+  impactCount: number;
+  limitations: string[];
+  createdAt: string;
+};
+
+export type SourceSnapshotDetailDto = SourceSnapshotDto & {
+  files: SourceFileDto[];
+  impacts: SourceImpactDto[];
+};
+
+export type ListSourceSnapshotsResponse = { snapshots: SourceSnapshotDto[] };
+
+export type GitHubStatusResponse = {
+  configured: boolean;
+};
 
 /** UTF-8 byte length without depending on Node or DOM globals. */
 export function utf8ByteLength(value: string): number {

@@ -7,6 +7,10 @@ import type {
   ContractVersionDto,
   FindingDto,
   ProjectDto,
+  SourceFileDto,
+  SourceImpactDto,
+  SourceSnapshotDetailDto,
+  SourceSnapshotDto,
 } from "@contract-ripple/shared";
 import type {
   AnalysisRunDetailRecord,
@@ -17,6 +21,11 @@ import type {
   ContractVersionWithContract,
   FindingRecord,
   ProjectRecordWithCount,
+  SourceFileRecord,
+  SourceImpactRecord,
+  SourceSnapshotDetailRecord,
+  SourceSnapshotRecord,
+  SourceSnapshotWithCount,
 } from "../db/types.js";
 import { utf8ByteLength } from "@contract-ripple/shared";
 
@@ -122,5 +131,63 @@ export function toAnalysisRunDetailDto(record: AnalysisRunDetailRecord): Analysi
     candidate: toContractSummaryDto(record.candidateVersion, record.candidateSummary),
     limitations: record.limitations,
     findings: record.findings.map(toFindingDto),
+  };
+}
+
+export function toSourceImpactDto(record: SourceImpactRecord): SourceImpactDto {
+  return {
+    id: record.id,
+    filePath: record.filePath,
+    line: record.line,
+    column: record.column,
+    snippet: record.snippet,
+    call: record.call,
+    method: record.method,
+    path: record.path,
+    matchedMethod: record.matchedMethod,
+    matchedPath: record.matchedPath,
+    operationId: record.operationId,
+    confidence: record.confidence,
+    evidence: record.evidence,
+  };
+}
+
+export function toSourceFileDto(record: SourceFileRecord): SourceFileDto {
+  return {
+    path: record.path,
+    bytes: record.bytes,
+    skipped: record.skipped,
+    reason: record.reason,
+  };
+}
+
+function toSourceSnapshotBase(record: SourceSnapshotRecord): Omit<SourceSnapshotDto, "impactCount"> {
+  return {
+    id: record.id,
+    projectId: record.projectId,
+    analysisRunId: record.analysisRunId,
+    sourceType: record.sourceType,
+    repository: record.repository,
+    ref: record.ref,
+    fileCount: record.fileCount,
+    skippedCount: record.skippedCount,
+    totalBytes: record.totalBytes,
+    limitations: record.limitations,
+    createdAt: record.createdAt.toISOString(),
+  };
+}
+
+export function toSourceSnapshotDto(record: SourceSnapshotWithCount): SourceSnapshotDto {
+  return { ...toSourceSnapshotBase(record), impactCount: record.impactCount };
+}
+
+export function toSourceSnapshotDetailDto(
+  record: SourceSnapshotDetailRecord,
+): SourceSnapshotDetailDto {
+  return {
+    ...toSourceSnapshotBase(record),
+    impactCount: record.impacts.length,
+    files: record.files.map(toSourceFileDto),
+    impacts: record.impacts.map(toSourceImpactDto),
   };
 }

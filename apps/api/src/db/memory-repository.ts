@@ -10,10 +10,16 @@ import type {
   CreateContractInput,
   CreateContractVersionInput,
   CreateProjectInput,
+  CreateSourceSnapshotInput,
   FindingRecord,
   ProjectRecord,
   ProjectRecordWithCount,
   Repository,
+  SourceFileRecord,
+  SourceImpactRecord,
+  SourceSnapshotDetailRecord,
+  SourceSnapshotRecord,
+  SourceSnapshotWithCount,
   UpdateProjectInput,
 } from "./types.js";
 
@@ -33,6 +39,9 @@ export class MemoryRepository implements Repository {
   private readonly versions = new Map<string, ContractVersionRecord>();
   private readonly analysisRuns = new Map<string, AnalysisRunRecord>();
   private readonly findings = new Map<string, FindingRecord>();
+  private readonly sourceSnapshots = new Map<string, SourceSnapshotRecord>();
+  private readonly sourceFiles = new Map<string, SourceFileRecord>();
+  private readonly sourceImpacts = new Map<string, SourceImpactRecord>();
 
   private nextId(prefix: string): string {
     this.counter += 1;
@@ -258,5 +267,88 @@ export class MemoryRepository implements Repository {
           candidateVersion: clone(candidateVersion),
         };
       });
+  }
+
+  async createSourceSnapshot(input: CreateSourceSnapshotInput): Promise<SourceSnapshotRecord> {
+    const record: SourceSnapshotRecord = {
+      id: this.nextId("source"),
+      projectId: input.projectId,
+      analysisRunId: input.analysisRunId ?? null,
+      sourceType: input.sourceType,
+      repository: input.repository ?? null,
+      ref: input.ref ?? null,
+      fileCount: input.fileCount,
+      skippedCount: input.skippedCount,
+      totalBytes: input.totalBytes,
+      limitations: [...input.limitations],
+      createdAt: new Date(),
+    };
+    this.sourceSnapshots.set(record.id, record);
+
+    for (const file of input.files) {
+      const id = this.nextId("sourcefile");
+      this.sourceFiles.set(id, {
+        id,
+        snapshotId: record.id,
+        path: file.path,
+        bytes: file.bytes,
+        skipped: file.skipped,
+        reason: file.reason ?? null,
+        createdAt: new Date(),
+      });
+    }
+
+    input.impacts.forEach((impact, position) => {
+      const id = this.nextId("impact");
+      this.sourceImpacts.set(id, {
+        id,
+        snapshotId: record.id,
+        position,
+        filePath: impact.filePath,
+        line: impact.line,
+        column: impact.column,
+        snippet: impact.snippet,
+        call: impact.call,
+        method: impact.method,
+        path: impact.path,
+        matchedMethod: impact.matchedMethod,
+        matchedPath: impact.matchedPath,
+        operationId: impact.operationId ?? null,
+        confidence: impact.confidence,
+        evidence: impact.evidence,
+        createdAt: new Date(),
+      });
+    });
+
+    return clone(record);
+  }
+
+  async getSourceSnapshot(id: string): Promise<SourceSnapshotDetailRecord | null> {
+    const snapshot = this.sourceSnapshots.get(id);
+    if (!snapshot) {
+      return null;
+    }
+    return {
+      ...clone(snapshot),
+      files: [...this.sourceFiles.values()]
+        .filter((file) => file.snapshotId === id)
+        .map(clone),
+      impacts: [...this.sourceImpacts.values()]
+        .filter((impact) => impact.snapshotId === id)
+        .sort((left, right) => left.position - right.position)
+        .map(clone),
+    };
+  }
+
+  async listSourceSnapshotsByProject(projectId: string): Promise<SourceSnapshotWithCount[]> {
+    return [...this.sourceSnapshots.values()]
+      .filter((snapshot) => snapshot.projectId === projectId)
+      .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+      .map((snapshot) => ({
+        ...clone(snapshot),
+        impactCount: [...this.sourceImpacts.values()].filter(
+          (impact) => impact.snapshotId === snapshot.id,
+        ).length,
+      }));
   }
 }
