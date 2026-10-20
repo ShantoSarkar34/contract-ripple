@@ -1,8 +1,10 @@
 import { compareContracts } from "@contract-ripple/engine";
-import type {
-  AnalysisRunDetailDto,
-  AnalysisRunDto,
-  CreateComparisonRequest,
+import {
+  DEFAULT_HISTORY_PAGE_SIZE,
+  type AnalysisRunDetailDto,
+  type CreateComparisonRequest,
+  type ListAnalysesResponse,
+  type ListComparisonsQuery,
 } from "@contract-ripple/shared";
 import type { Repository } from "../db/types.js";
 import { badRequest, notFound } from "../middleware/http-error.js";
@@ -85,14 +87,33 @@ export async function createComparison(
 export async function listComparisons(
   repository: Repository,
   projectId: string,
-): Promise<AnalysisRunDto[]> {
+  query: ListComparisonsQuery = { limit: DEFAULT_HISTORY_PAGE_SIZE },
+): Promise<ListAnalysesResponse> {
   const project = await repository.getProject(projectId);
   if (!project) {
     throw notFound("project_not_found", "Project not found.");
   }
 
-  const runs = await repository.listAnalysisRunsByProject(projectId);
-  return runs.map(toAnalysisRunDto);
+  if (query.cursor) {
+    const cursorRun = await repository.getAnalysisRunScope(query.cursor);
+    if (!cursorRun || cursorRun.projectId !== projectId) {
+      throw badRequest(
+        "invalid_cursor",
+        "The history cursor is invalid for this project.",
+      );
+    }
+  }
+
+  const page = await repository.listAnalysisRunsByProjectPage(projectId, {
+    limit: query.limit,
+    cursor: query.cursor,
+  });
+
+  return {
+    analyses: page.runs.map(toAnalysisRunDto),
+    nextCursor: page.nextCursor,
+    totalCount: page.totalCount,
+  };
 }
 
 export async function getComparison(

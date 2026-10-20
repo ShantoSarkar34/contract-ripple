@@ -143,8 +143,9 @@ migration SQL was generated with `prisma migrate diff` and applied with
 ## Health, CORS, and verification
 
 The API returns `Access-Control-Allow-Origin` only for exact origins listed in
-`CORS_ORIGINS`. CORS is not authentication and does not stop non-browser clients
-from calling the API.
+`CORS_ORIGINS`. It exposes `Content-Disposition` so browser clients can read
+report download filenames. CORS is not authentication and does not stop
+non-browser clients from calling the API.
 
 Current live checks used during deployment:
 
@@ -156,8 +157,9 @@ curl.exe -sS https://contractripple-api.vercel.app/api/v1/projects `
 ```
 
 The browser workspace at `/contracts` should show the deployed API endpoint and
-the **Connected** indicator, then load real projects, contracts, comparison
-history, and source snapshots from PostgreSQL.
+the **Connected** indicator, then load real projects, contracts, paginated
+comparison history, reports, source snapshots, and regression suggestions from
+PostgreSQL. Phase 6 adds no environment variables and no database migration.
 
 ## Security status
 
@@ -175,7 +177,9 @@ access-control boundary.
   `main`. The current live API was deployed from the CLI from `open-branch`
   before that branch was merged; it contains only deployment changes plus the
   same API behavior as `main`.
-- The frontend production deployment still corresponds to `main`. Phase 5 work
-  on `open-branch` becomes live only after the user merges and Vercel redeploys.
+- The frontend production deployment still corresponds to `main`. Phase 5/6
+  work on `open-branch` becomes live only after the user merges and Vercel
+  redeploys. Report exports include the latest source snapshot, so a newly run
+  source analysis requires a fresh export.
 - Vercel's 4.5 MB request limit is lower than the application's documented
   10 MiB ZIP limit.

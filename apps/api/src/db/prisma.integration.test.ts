@@ -82,7 +82,7 @@ describe.skipIf(!shouldRun)("PrismaRepository (integration)", () => {
     expect(stored.limitations.length).toBeGreaterThan(0);
 
     const runs = await listComparisons(repository, project.id);
-    expect(runs.map((run) => run.id)).toContain(created.id);
+    expect(runs.analyses.map((run) => run.id)).toContain(created.id);
 
     const projects = await repository.listProjects();
     const storedProject = projects.find((entry) => entry.id === project.id);

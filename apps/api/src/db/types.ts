@@ -103,6 +103,22 @@ export type AnalysisRunDetailRecord = AnalysisRunRecord & {
   findings: FindingRecord[];
 };
 
+export type ListAnalysisRunsPageOptions = {
+  limit: number;
+  cursor?: string;
+};
+
+export type AnalysisRunPageRecord = {
+  runs: AnalysisRunWithVersions[];
+  totalCount: number;
+  nextCursor: string | null;
+};
+
+export type AnalysisRunScopeRecord = {
+  id: string;
+  projectId: string;
+};
+
 export type CreateProjectInput = {
   name: string;
   description?: string;
@@ -271,9 +287,15 @@ export interface Repository {
 
   createAnalysisRun(input: CreateAnalysisRunInput): Promise<AnalysisRunRecord>;
   getAnalysisRun(id: string): Promise<AnalysisRunDetailRecord | null>;
+  getAnalysisRunScope(id: string): Promise<AnalysisRunScopeRecord | null>;
   listAnalysisRunsByProject(projectId: string): Promise<AnalysisRunWithVersions[]>;
+  listAnalysisRunsByProjectPage(
+    projectId: string,
+    options: ListAnalysisRunsPageOptions,
+  ): Promise<AnalysisRunPageRecord>;
 
   createSourceSnapshot(input: CreateSourceSnapshotInput): Promise<SourceSnapshotRecord>;
   getSourceSnapshot(id: string): Promise<SourceSnapshotDetailRecord | null>;
   listSourceSnapshotsByProject(projectId: string): Promise<SourceSnapshotWithCount[]>;
+  listSourceSnapshotsByAnalysisRun(analysisRunId: string): Promise<SourceSnapshotWithCount[]>;
 }

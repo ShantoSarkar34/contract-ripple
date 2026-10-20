@@ -16,6 +16,7 @@ import {
   RISK_ORDER,
   methodClass,
 } from "@/lib/findings";
+import ReportActions from "./report-actions";
 
 const INITIAL_VISIBLE_FINDINGS = 100;
 
@@ -135,18 +136,21 @@ export default function ComparisonResults({ analysis }: { analysis: AnalysisRunD
 
   return (
     <section id="comparison-report" className="scroll-mt-24 space-y-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-lg font-semibold text-foreground">
-          Comparison report
-          {analysis.label ? (
-            <span className="ml-2 text-sm font-normal text-slate-500 dark:text-slate-400">
-              {analysis.label}
-            </span>
-          ) : null}
-        </h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          {new Date(analysis.createdAt).toLocaleString()} · {analysis.durationMs} ms
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-semibold text-foreground">
+            Comparison report
+            {analysis.label ? (
+              <span className="ml-2 text-sm font-normal text-slate-500 dark:text-slate-400">
+                {analysis.label}
+              </span>
+            ) : null}
+          </h3>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            {new Date(analysis.createdAt).toLocaleString()} · {analysis.durationMs} ms
+          </p>
+        </div>
+        <ReportActions analysis={analysis} />
       </div>
 
       <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">

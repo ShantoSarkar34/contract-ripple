@@ -18,6 +18,7 @@ import type {
   ListVersionsResponse,
   ProjectDto,
   ReadyResponse,
+  ReportFormat,
   SourceSnapshotDetailDto,
   SourceSnapshotDto,
   UpdateProjectRequest,
@@ -133,6 +134,39 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return payload as T;
 }
 
+async function requestBlob(path: string): Promise<Blob> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`);
+  } catch {
+    throw new ApiRequestError(
+      0,
+      "network_error",
+      `Could not reach the API at ${API_BASE_URL}. Confirm the backend is running.`,
+    );
+  }
+
+  if (!response.ok) {
+    const text = await response.text();
+    const payload = text.length > 0 ? safeJson(text) : undefined;
+    if (isErrorEnvelope(payload)) {
+      throw new ApiRequestError(
+        response.status,
+        payload.error.code,
+        payload.error.message,
+        payload.error.details,
+      );
+    }
+    throw new ApiRequestError(
+      response.status,
+      "unknown_error",
+      `Request failed with status ${response.status}.`,
+    );
+  }
+
+  return response.blob();
+}
+
 function id(value: string): string {
   return encodeURIComponent(value);
 }
@@ -197,8 +231,21 @@ export const api = {
     return request<ContractVersionDetailDto>(`/versions/${id(versionId)}`);
   },
 
-  listComparisons(projectId: string): Promise<ListAnalysesResponse> {
-    return request<ListAnalysesResponse>(`/projects/${id(projectId)}/comparisons`);
+  listComparisons(
+    projectId: string,
+    options: { limit?: number; cursor?: string } = {},
+  ): Promise<ListAnalysesResponse> {
+    const params = new URLSearchParams();
+    if (options.limit !== undefined) {
+      params.set("limit", String(options.limit));
+    }
+    if (options.cursor) {
+      params.set("cursor", options.cursor);
+    }
+    const query = params.toString();
+    return request<ListAnalysesResponse>(
+      `/projects/${id(projectId)}/comparisons${query ? `?${query}` : ""}`,
+    );
   },
 
   createComparison(
@@ -213,6 +260,15 @@ export const api = {
 
   getComparison(comparisonId: string): Promise<AnalysisRunDetailDto> {
     return request<AnalysisRunDetailDto>(`/comparisons/${id(comparisonId)}`);
+  },
+
+  getComparisonReportFile(
+    comparisonId: string,
+    format: ReportFormat,
+  ): Promise<Blob> {
+    return requestBlob(
+      `/comparisons/${id(comparisonId)}/report?format=${encodeURIComponent(format)}`,
+    );
   },
 
   getGitHubStatus(): Promise<GitHubStatusResponse> {

@@ -37,7 +37,12 @@ export function createApp({
   const app = express();
 
   app.disable("x-powered-by");
-  app.use(cors({ origin: corsOrigins }));
+  app.use(
+    cors({
+      origin: corsOrigins,
+      exposedHeaders: ["Content-Disposition"],
+    }),
+  );
   app.use(express.json({ limit: JSON_BODY_LIMIT }));
 
   app.use("/api/v1", createHealthRouter(repository));

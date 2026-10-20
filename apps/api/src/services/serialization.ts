@@ -28,6 +28,7 @@ import type {
   SourceSnapshotWithCount,
 } from "../db/types.js";
 import { utf8ByteLength } from "@contract-ripple/shared";
+import { generateRegressionSuggestions } from "./regression-tests.js";
 
 export function toProjectDto(record: ProjectRecordWithCount): ProjectDto {
   return {
@@ -125,12 +126,14 @@ export function toAnalysisRunDto(record: AnalysisRunWithVersions): AnalysisRunDt
 }
 
 export function toAnalysisRunDetailDto(record: AnalysisRunDetailRecord): AnalysisRunDetailDto {
+  const findings = record.findings.map(toFindingDto);
   return {
     ...toAnalysisRunDto(record),
     baseline: toContractSummaryDto(record.baselineVersion, record.baselineSummary),
     candidate: toContractSummaryDto(record.candidateVersion, record.candidateSummary),
     limitations: record.limitations,
-    findings: record.findings.map(toFindingDto),
+    findings,
+    regressionSuggestions: generateRegressionSuggestions(findings),
   };
 }
 

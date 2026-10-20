@@ -1,4 +1,4 @@
-# ContractRipple — API reference (Phase 4)
+# ContractRipple — API reference (Phase 6)
 
 Base URL: `/api/v1` (configure the frontend with `NEXT_PUBLIC_API_BASE_URL`,
 for example `http://localhost:4000/api/v1`).
@@ -30,7 +30,7 @@ return: no stack traces, file paths, or raw contract contents.
 
 | Code | Status | Meaning |
 | --- | --- | --- |
-| `validation_error` | 400 | Request body failed schema validation |
+| `validation_error` | 400 | Request body or query failed schema validation |
 | `invalid_request` | 400 | Missing route parameter |
 | `empty_input` | 400 | Contract content was empty |
 | `invalid_json` | 400 | Contract was not valid JSON |
@@ -39,6 +39,7 @@ return: no stack traces, file paths, or raw contract contents.
 | `circular_input` | 400 | Contract contained circular structures |
 | `invalid_options` | 400 | Unsupported format override |
 | `version_project_mismatch` | 400 | Compared versions belong to different projects |
+| `invalid_cursor` | 400 | History cursor is unknown or belongs to another project |
 | `comparison_project_mismatch` | 400 | Source analysis comparison belongs to another project |
 | `no_comparison` | 400 | Source analysis requires an existing comparison |
 | `archive_required` | 400 | ZIP request had no `archive` file |
@@ -82,6 +83,13 @@ return: no stack traces, file paths, or raw contract contents.
 - Source analysis wall-clock budget: 20 seconds (`analysis_timeout`, HTTP 408).
 - GitHub source: 2,000 source files, 25 MiB total, 1 MiB per file; only files
   reported by the Git Trees API are fetched (no clone, no execution).
+- Saved history: 1–50 comparisons per page (default 20), ordered by creation
+  time descending with id as tie-breaker.
+- Reports: generated on request from the comparison plus the latest attached
+  source snapshot. JSON includes all findings and the latest snapshot's
+  impacts. Regression suggestions keep up to 20 evidence strings each; all
+  finding ids remain present.
+- Reports are not cached (`Cache-Control: no-store`).
 
 ## Health
 
@@ -235,6 +243,22 @@ the result is stored. Response `201` is an `AnalysisRunDetailDto`:
       "before": "{...}",
       "after": null
     }
+  ],
+  "regressionSuggestions": [
+    {
+      "id": "suggestion:post:/pets",
+      "method": "post",
+      "path": "/pets",
+      "operationId": "createPet",
+      "risk": "potentially_breaking",
+      "title": "Regression checks for POST /pets",
+      "rationale": "Derived from 2 classified findings for this operation; highest risk: potentially breaking.",
+      "findingIds": ["f_..."],
+      "evidence": ["Operation `POST /pets` was removed (#/paths/~1pets/post)"],
+      "suggestedChecks": [
+        "Exercise the client path that used this operation and confirm it fails gracefully or has been removed."
+      ]
+    }
   ]
 }
 ```
@@ -245,14 +269,77 @@ the result is stored. Response `201` is an `AnalysisRunDetailDto`:
 `potentially_breaking`, or `unknown`. Findings are returned in deterministic
 engine order.
 
+`regressionSuggestions` are derived from findings that have both a method and a
+path. Each suggestion groups those findings, keeps the highest risk, and lists
+review checks based on the finding categories and change types. Suggestions are
+not executable tests and do not invent expected status codes or runtime
+behavior. Findings without an operation scope remain in `findings` but do not
+produce a suggestion.
+
 ### `GET /projects/:projectId/comparisons`
 
-Response `200`: `{ "analyses": AnalysisRunDto[] }` ordered newest first, without
-findings.
+Query:
+
+- `limit`: optional integer, 1–50, default 20.
+- `cursor`: optional `nextCursor` from a previous response.
+
+Response `200`:
+
+```json
+{
+  "analyses": [],
+  "nextCursor": null,
+  "totalCount": 0
+}
+```
+
+`analyses` is ordered newest first (createdAt descending, id descending) and
+omits findings. `nextCursor` is the id to pass to the next request, or `null` on
+the last page. `totalCount` is the number of saved comparisons in the project.
+An unknown cursor, or one from another project, returns `400 invalid_cursor`.
 
 ### `GET /comparisons/:comparisonId`
 
-Response `200`: the full `AnalysisRunDetailDto`, including findings.
+Response `200`: the full `AnalysisRunDetailDto`, including findings and
+regression suggestions.
+
+### `GET /comparisons/:comparisonId/report`
+
+Query: `format=json` (default) or `format=markdown`.
+
+The response is a file attachment generated from the persisted comparison. It
+contains the summary, baseline/candidate metadata, all findings, regression
+suggestions, limitations, notes, and the latest source snapshot attached to the
+comparison with its impacts (`availableSnapshotCount` reports how many snapshots
+exist). JSON is `application/json`; Markdown is `text/markdown`. Both use
+`Cache-Control: no-store` and a `Content-Disposition` filename. Unknown
+comparisons return `404 comparison_not_found`.
+
+Example JSON report shape:
+
+```json
+{
+  "schemaVersion": "contract-ripple.report.v1",
+  "generatedAt": "2026-01-01T00:00:00.000Z",
+  "project": { "id": "cm...", "name": "Pets" },
+  "comparison": { "id": "cm...", "label": "v1 → v2", "totalFindings": 3, "...": "..." },
+  "baseline": { "...": "..." },
+  "candidate": { "...": "..." },
+  "findings": [],
+  "regressionSuggestions": [],
+  "sourceAnalysis": {
+    "availableSnapshotCount": 1,
+    "includedSnapshotId": "cm...",
+    "snapshot": { "id": "cm...", "sourceType": "zip", "impactCount": 2, "impacts": [] }
+  },
+  "limitations": [],
+  "notes": ["..."]
+}
+```
+
+The Markdown export is the readable version: summary tables, regression checks,
+the latest source evidence, a findings table, before/after evidence, limitations,
+and notes. See `docs/reports.md` for generation rules and limitations.
 
 ## Source analysis
 

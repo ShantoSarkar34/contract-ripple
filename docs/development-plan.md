@@ -41,13 +41,13 @@ See `docs/architecture.md` for boundaries and data flow.
 | **2** | OpenAPI engine | parsing, validation, comparison, classification, tests, clean engine interface | **Done** |
 | **3** | Backend + database | Prisma models, migrations, `/api/v1`, persistence, real frontend integration | **Done** |
 | **4** | Source analysis | AST matching, secure ZIP pipeline, real GitHub integration, evidence | **Done** |
-| **5** | Impact graph + UI | evidence-backed graph, filterable findings, accessible views | **In review** |
-| **6** | Reports + history | saved history, JSON/readable exports, regression suggestions | Planned |
+| **5** | Impact graph + UI | evidence-backed graph, filterable findings, accessible views | **Done** |
+| **6** | Reports + history | saved history, JSON/readable exports, regression suggestions | **In review** |
 | **7** | Auth + security + deploy | sessions, authorization, IDOR tests, hardening, release checklist | Planned |
 
 Each phase ends with a completion report and stops. No phase starts automatically.
 
-## Phase 1 decisions (this phase)
+## Phase 1 decisions
 
 - **Monorepo migration is incremental.** The deployed Next.js app stays at the repository root so
   the live Vercel deployment keeps working. `apps/api` and `packages/shared` are added as npm
@@ -59,7 +59,7 @@ Each phase ends with a completion report and stops. No phase starts automaticall
 - **Backend scaffold only.** Health endpoint plus configuration and Prisma schema. No analysis
   engine, persistence models, authentication, GitHub integration, or source analysis yet.
 
-## Phase 2 decisions (this phase)
+## Phase 2 decisions
 
 - **Engine package:** `packages/engine` is a standalone npm workspace with no
   HTTP, database, auth, GitHub, ZIP, or graph dependencies. The public entry
@@ -87,7 +87,7 @@ Each phase ends with a completion report and stops. No phase starts automaticall
 See `docs/engine.md` for the full interface, classification table, and
 limitations.
 
-## Phase 3 decisions (this phase)
+## Phase 3 decisions
 
 - **Persistence models:** `Project`, `Contract`, `ContractVersion`,
   `AnalysisRun`, and `Finding` in PostgreSQL. `ContractVersion` stores the raw
@@ -123,7 +123,7 @@ limitations.
 
 See `docs/api.md` for the endpoint reference.
 
-## Phase 4 decisions (this phase)
+## Phase 4 decisions
 
 - **Separate source package:** `packages/source-analysis` owns TypeScript AST
   parsing, call detection, path matching, and evidence generation. The API layer
@@ -175,7 +175,7 @@ See `docs/source-analysis.md` and `docs/api.md` for details.
   repository cloning.
 - Background queues, per-user rate limits, or analysis caching.
 
-## Phase 5 decisions (this phase)
+## Phase 5 decisions
 
 - **Standalone graph builder:** `packages/impact-graph` is dependency-free and
   deterministic. It groups findings into operations, matches persisted source
@@ -223,6 +223,57 @@ See `docs/source-analysis.md` and `docs/api.md` for details.
 - Graph editing, drag-and-drop, zoom/pan canvases, or a new graph database.
 - Runtime verification, code execution, or fetching additional source files.
 - Changing the frontend's repository location or Vercel deployment settings.
+- Replacing the landing page's clearly labeled demo content with fabricated
+  analysis results.
+
+## Phase 6 decisions
+
+- **Reports are generated from persisted records.** The JSON report is a
+  deterministic projection of the stored comparison, its findings, the
+  generated regression suggestions, and the latest source snapshot attached to
+  that comparison. There is no report table, background job, or stored file.
+- **JSON is the complete export; Markdown is the readable export.** Both are
+  downloaded from `GET /comparisons/:comparisonId/report`, with
+  `format=json|markdown`. The JSON export preserves all finding fields and
+  source impacts. Markdown includes the summary, suggestions, source evidence,
+  findings table, before/after evidence, limitations, and notes. See
+  `docs/reports.md`.
+- **Only the latest source snapshot is included.** A comparison can have
+  multiple ZIP/GitHub snapshots. Exporting all of them would duplicate evidence
+  and inflate downloads, so the report records how many snapshots exist and
+  includes the newest one. The source panel still exposes every snapshot.
+- **Regression suggestions are review prompts, not fabricated test code.**
+  Suggestions are grouped by normalized method + path from persisted findings.
+  The highest finding risk sets the suggestion risk; checks are derived from
+  the finding categories and change types. No expected status code, runtime
+  behavior, framework, or test file is invented. Findings without both method
+  and path are not turned into operation-level tests.
+- **Saved-history pagination is cursor-based.** `GET
+  /projects/:projectId/comparisons` accepts `limit` (1–50, default 20) and an
+  opaque `cursor` (the last comparison id). The response includes `nextCursor`
+  and `totalCount`. Ordering is `createdAt` descending with id as a stable
+  tie-breaker, so new comparisons do not shift pages.
+- **The client never rebuilds exports.** The report actions download the API's
+  JSON/Markdown response, so the frontend and downloaded report share the same
+  persisted data and suggestion algorithm. Object URLs are revoked after the
+  download starts.
+- **No schema migration.** History and source snapshots were already persisted.
+  Phase 6 adds repository read methods, DTO fields, API routes, UI states, and
+  tests only.
+- **No public data boundary change.** The API remains unauthenticated until
+  Phase 7. Export routes inherit the same lack of ownership checks and must not
+  receive real user data yet.
+
+## Non-goals for Phase 6
+
+- Authentication, authorization, per-user ownership, rate limiting, and public
+  deployment hardening (Phase 7).
+- Generated executable test files, framework-specific test syntax, running
+  tests, or asserting expected HTTP status codes not present in the findings.
+- Scheduled/emailed reports, share links, PDF generation, report tables,
+  object-storage archives, or background export jobs.
+- Including every historical source snapshot in one report.
+- Changing the frontend repository location or Vercel deployment settings.
 - Replacing the landing page's clearly labeled demo content with fabricated
   analysis results.
 
@@ -281,6 +332,14 @@ See `docs/source-analysis.md` and `docs/api.md` for details.
   operations, 400 files, and 800 relationships, with 20 evidence entries per
   relation. Truncation is reported. The SVG map is pointer-oriented; preserve
   the equivalent semantic table when changing the graph UI.
+- **Report scope:** exports are generated on demand from persisted records and
+  include only the latest source snapshot per comparison. Do not present older
+  snapshots as included, and do not turn review prompts into executable tests or
+  invented expected status codes. The API remains unauthenticated until Phase 7,
+  so reports must not contain real user data yet.
+- **Markdown escaping:** finding summaries, paths, and source snippets are
+  untrusted. Keep table/inline escaping and dynamic code-fence sizing when adding
+  report sections.
 - **GitHub credential scope:** Phase 4 uses one server-side `GITHUB_TOKEN`
   (installation token or fine-grained PAT). Per-user OAuth/App installation and
   token storage require the authentication/session work in Phase 7. Rotate the

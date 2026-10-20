@@ -1,6 +1,6 @@
 # ContractRipple — Architecture
 
-## Current state (Phase 5)
+## Current state (Phase 6)
 
 The repository contains one Next.js application at the repository root, an
 Express API with persistence, a shared types/schemas package, a standalone
@@ -8,8 +8,10 @@ OpenAPI comparison engine, a source-analysis package, and a standalone impact
 graph builder. The `/contracts` route is wired to the real API and database;
 source analysis (ZIP and GitHub) is available for a comparison, and the
 source-impact panel renders an evidence-backed operation→file map with a
-filterable findings table and an accessible relationships view. The marketing
-page (`/`) still renders clearly labeled demo content.
+filterable findings table and an accessible relationships view. Saved history
+is cursor-paginated, comparisons can be downloaded as JSON or Markdown, and
+operation-scoped regression suggestions are derived from persisted findings.
+The marketing page (`/`) still renders clearly labeled demo content.
 
 ```
 contract-ripple/            # git repo root
@@ -18,12 +20,13 @@ contract-ripple/            # git repo root
 ├── src/components/         # presentation components (demo + contracts workspace)
 ├── src/lib/                # frontend API client and view helpers
 ├── apps/api/               # Express API (routes, services, repositories)
+│   ├── src/services/       # comparison, source, report, and regression-tests logic
 │   └── prisma/             # Prisma schema + migrations
 ├── packages/shared/        # shared types/schemas (zod request schemas)
 ├── packages/engine/        # OpenAPI parse/validate/normalize/compare/classify
 ├── packages/source-analysis/ # TypeScript AST call detection + path matching
 ├── packages/impact-graph/  # deterministic findings + impacts → operation/file graph
-├── docs/                   # plans, architecture, design review, engine/API/source/graph docs
+├── docs/                   # plans, architecture, design review, engine/API/source/graph/report docs
 ├── .env.example            # frontend placeholders
 └── apps/api/.env.example   # backend placeholders
 ```
@@ -117,7 +120,19 @@ parse (JSON/YAML) → validate → canonicalize → normalize → compare → cl
 - See `docs/impact-graph.md` for the model, construction rules, limits, library
   evaluation, and UI/accessibility behavior.
 
-## Data flow (implemented in Phase 5)
+### Reports and regression suggestions (`apps/api/src/services/`)
+- `regression-tests.ts` is a pure, deterministic function over persisted
+  findings. It groups findings by normalized method + path, keeps the highest
+  risk, derives review checks from categories/change types, and ignores
+  findings that are not operation-scoped.
+- `reports.ts` projects a stored `AnalysisRunDetailDto` plus the latest
+  attached source snapshot into the shared `AnalysisReportDto`. It renders the
+  same report as Markdown. It does not inspect or mutate source content beyond
+  the persisted evidence.
+- Reports are generated on request. There is no report table, file archive, or
+  background worker. Unknown comparisons return the normal `404` envelope.
+
+## Data flow (implemented in Phase 6)
 
 ```
 Contract upload (JSON/YAML text, ≤ 5 MiB)
@@ -134,10 +149,12 @@ Compare stored baseline ↔ candidate ──► AnalysisRun + Finding rows (clas
         │                                      (evidence: file, line, snippet, confidence)
         ├──► Impact graph (client-side: changed operations ↔ persisted source matches,
         │                  map + accessible relationships table, evidence details)
-        └──► Reports (JSON / readable) + regression suggestions               (Phase 6)
+        ├──► Saved history (cursor-paginated comparison list, newest first)
+        ├──► Regression suggestions (operation-scoped review prompts from findings)
+        └──► Report exports (JSON + Markdown; latest attached source snapshot)
 ```
 
-## API surface (implemented in Phase 5)
+## API surface (implemented in Phase 6)
 
 Under `/api/v1`:
 
@@ -150,12 +167,14 @@ Under `/api/v1`:
 - Versions: `POST /contracts/:contractId/versions` (validates before saving),
   `GET /contracts/:contractId/versions`, `GET /versions/:versionId`.
 - Comparisons: `POST /projects/:projectId/comparisons`,
-  `GET /projects/:projectId/comparisons`, `GET /comparisons/:comparisonId`.
+  `GET /projects/:projectId/comparisons` (cursor pagination),
+  `GET /comparisons/:comparisonId`.
 - Source analysis: `POST /projects/:projectId/source/zip` (multipart),
   `POST /projects/:projectId/source/github`,
   `GET /projects/:projectId/source`, `GET /source/:snapshotId`,
   `GET /github/status`.
-- Reports/exports (Phase 6).
+- Reports: `GET /comparisons/:comparisonId/report?format=json|markdown`
+  (download attachment; latest attached source snapshot included).
 
 The impact graph is a client-side projection of the comparison and source DTOs;
 it adds no endpoints or database tables.
@@ -174,12 +193,13 @@ endpoints will require authentication and ownership checks in Phase 7.
 - No secrets in logs, client responses, or repository files.
 - CORS uses an explicit origin allowlist from environment configuration.
 
-## Persistence (implemented in Phase 5)
+## Persistence (implemented in Phase 6)
 
 Prisma + PostgreSQL. Models: `Project`, `Contract`, `ContractVersion`,
 `AnalysisRun`, `Finding`, `SourceSnapshot`, `SourceFile`, and `SourceImpact`,
-with `AnalysisStatus` as a Postgres enum. Phase 5 adds no schema changes; the
-impact graph is derived from these records. Cascading deletes remove contracts,
+with `AnalysisStatus` as a Postgres enum. Phases 5 and 6 add no schema changes;
+the impact graph, pagination, reports, and regression suggestions are derived
+from these records. Cascading deletes remove contracts,
 versions, runs, findings, and source snapshots with their parent project (source
 snapshots keep their comparison via `onDelete: SetNull`). `ContractVersion`
 stores untrusted spec text plus a SHA-256 checksum; `Finding` and `SourceImpact`
@@ -206,3 +226,6 @@ are applied with `prisma migrate deploy`.
 - Graph library choice — resolved in Phase 5: a dependency-free, deterministic
   SVG layout with an accessible table fallback was chosen over React Flow,
   d3-force, and Cytoscape. See `docs/impact-graph.md`.
+- Report format and storage — resolved in Phase 6: generate JSON and Markdown on
+  request from persisted records, include the latest source snapshot, and store
+  no report artifacts. See `docs/reports.md`.

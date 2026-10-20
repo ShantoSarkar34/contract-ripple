@@ -5,14 +5,15 @@ potential impact on frontend integrations. It compares OpenAPI specifications, c
 potentially breaking changes, analyzes frontend source code for affected calls, and visualizes
 the evidence-backed relationships.
 
-> **Status:** Phase 5. The OpenAPI engine is wired to an Express API with
+> **Status:** Phase 6. The OpenAPI engine is wired to an Express API with
 > PostgreSQL persistence, and the `/contracts` workspace runs real comparisons,
 > shows classified findings in a filterable table with JSON Pointer evidence,
 > analyzes ZIP/GitHub source for affected integrations with file/line evidence,
-> and renders an evidence-backed operation→file impact graph with an accessible
-> relationships view. The landing page (`/`) still renders clearly labeled demo
-> content. Report exports, saved-history pagination, regression suggestions, and
-> authentication are not implemented yet.
+> renders an evidence-backed operation→file impact graph with an accessible
+> relationships view, paginates saved history, downloads JSON/Markdown reports,
+> and derives regression review prompts from persisted findings. The landing
+> page (`/`) still renders clearly labeled demo content. Authentication and
+> ownership checks are not implemented yet.
 
 ## Stack
 
@@ -35,14 +36,14 @@ contract-ripple/            # git repo root (frontend + workspaces)
 │   └── lib/
 ├── apps/
 │   └── api/                # Express API (routes, services, repositories)
-│       ├── src/
+│       ├── src/            # services include reports + regression suggestions
 │       └── prisma/         # schema + migrations
 ├── packages/
 │   ├── engine/             # OpenAPI parse/validate/normalize/compare/classify
 │   ├── source-analysis/    # TypeScript AST call detection + operation matching
 │   ├── impact-graph/       # deterministic operation→source graph builder
 │   └── shared/             # shared types and zod request schemas
-├── docs/                   # plan, architecture, design review, engine/API/source/graph docs
+├── docs/                   # plan, architecture, design review, engine/API/source/graph/report docs
 ├── AGENTS.md               # permanent project instructions
 └── .env.example
 ```
@@ -177,6 +178,22 @@ comparison findings or the exact source evidence (file, line, column, snippet).
 See `docs/impact-graph.md` for the model, construction rules, library
 evaluation, limits, and known limitations.
 
+## Reports and regression checks
+
+The comparison report header downloads the persisted analysis as JSON or
+Markdown. Both exports include findings, limitations, notes, and the latest
+source snapshot attached to that comparison; the JSON form is complete and the
+Markdown form is readable, with summary tables, source evidence, and before/after
+code blocks.
+
+The workspace also renders operation-scoped regression suggestions derived from
+the findings. They are review prompts, not generated executable tests or claims
+that the API is broken. Nothing is invented for findings without a method and
+path. Saved history loads in pages of 20 with a validated cursor.
+
+See `docs/reports.md` for the report model, suggestion rules, latest-snapshot
+policy, limits, and tests.
+
 ## Environment variables
 
 Frontend (`.env.local`, see `.env.example`):
@@ -214,8 +231,10 @@ Base URL `/api/v1`. All responses are JSON; errors use a consistent
   `GET /contracts/:contractId`
 - `POST /contracts/:contractId/versions` (validates before saving),
   `GET /contracts/:contractId/versions`, `GET /versions/:versionId`
-- `POST /projects/:projectId/comparisons`, `GET /projects/:projectId/comparisons`,
+- `POST /projects/:projectId/comparisons`,
+  `GET /projects/:projectId/comparisons` (cursor pagination),
   `GET /comparisons/:comparisonId`
+- `GET /comparisons/:comparisonId/report?format=json|markdown` (download)
 - `POST /projects/:projectId/source/zip` (multipart), `POST /projects/:projectId/source/github`,
   `GET /projects/:projectId/source`, `GET /source/:snapshotId`, `GET /github/status`
 
@@ -232,8 +251,8 @@ Unit and route tests use Vitest and live next to the code they cover:
 - `packages/engine/src/*.test.ts` — parsing, validation, comparison, classification, security.
 - `packages/source-analysis/src/*.test.ts` — AST call detection, path matching, template paths, limits.
 - `packages/impact-graph/src/*.test.ts` — graph grouping, matching, filters, limits, evidence, and deterministic ordering.
-- `apps/api/src/services/*.test.ts` — project/contract/comparison/source services with an in-memory repository.
-- `apps/api/src/routes/app.test.ts`, `apps/api/src/routes/source.test.ts` — real HTTP requests against an ephemeral server.
+- `apps/api/src/services/*.test.ts` — project/contract/comparison/source/report services with an in-memory repository; regression-suggestion grouping, evidence bounds, and stable ordering.
+- `apps/api/src/routes/app.test.ts`, `apps/api/src/routes/source.test.ts`, `apps/api/src/routes/reports.test.ts` — real HTTP requests against an ephemeral server, including pagination and JSON/Markdown downloads.
 
 ```bash
 npm test
@@ -245,8 +264,9 @@ JSON Pointer escaping, input limits, and security cases. The graph tests cover
 grouping, normalized matching, unmatched evidence, filters, limits, deterministic
 ordering, and the no-missing-endpoints guarantee. The API tests cover input
 validation, engine error mapping, persistence DTOs, cross-project checks, ZIP
-traversal and size limits, GitHub error mapping, and the full project → contract
-→ version → comparison → source-analysis flow.
+traversal and size limits, GitHub error mapping, saved-history pagination,
+report downloads, regression-suggestion generation, and the full project →
+contract → version → comparison → source-analysis flow.
 
 One PostgreSQL integration test is skipped by default. Run it against a
 configured `apps/api/.env` database with:
@@ -286,6 +306,7 @@ source archive, reads the snapshot back, and deletes the project at the end.
 - `docs/engine.md` — OpenAPI engine interface, rules, and limitations.
 - `docs/source-analysis.md` — source detection, matching, ZIP/GitHub security, and limits.
 - `docs/impact-graph.md` — graph model, construction rules, limits, accessibility, and library evaluation.
+- `docs/reports.md` — report exports, regression suggestions, latest-snapshot policy, and limits.
 - `docs/deployment.md` — Vercel frontend/API topology, environment variables, limits, and security status.
 - `docs/design-review.md` — UI review and improvement priorities.
 

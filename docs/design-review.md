@@ -27,9 +27,24 @@ recommendations:
 - **States:** the graph and table show explicit empty, filtered, unmatched, truncation, and
   static-analysis limitation text.
 
-Remaining, deferred to later phases: sortable table columns, a sticky table header, history
-pagination, report/export views (Phase 6), and authentication-aware UI (Phase 7). A manual theme
-toggle is not required while the app follows the operating-system preference.
+## Phase 6 resolution
+
+Phase 6 addressed history and export UX:
+
+- **History:** the workspace loads 20 saved comparisons at a time, shows loaded/total counts, marks
+  the active comparison, includes date/change/truncation metadata, and offers an explicit "Load more"
+  control. Loading, empty, error, and retry states are separate from the comparison content.
+- **Exports:** JSON and Markdown download controls sit in the comparison report header, report
+  failures are shown inline, and the UI explains that exports contain findings, suggestions, and the
+  latest source analysis.
+- **Regression checks:** a dedicated section lists operation-scoped review prompts with risk,
+  method/path, suggested checks, and expandable evidence. Empty states explain when no
+  operation-scoped findings exist. The copy makes clear that these are not executable tests.
+- **Navigation:** the sticky context bar links to the regression-check section as well.
+
+Remaining, deferred to later phases: sortable table columns, a sticky table header, and
+authentication-aware UI (Phase 7). A manual theme toggle is not required while the app follows the
+operating-system preference.
 
 ## Current UI inventory
 
