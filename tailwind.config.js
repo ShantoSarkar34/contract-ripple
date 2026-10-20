@@ -1,6 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  darkMode: "class",
+  darkMode: "media",
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -9,6 +9,8 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        background: "rgb(var(--background-rgb) / <alpha-value>)",
+        foreground: "rgb(var(--foreground-rgb) / <alpha-value>)",
         // Primary brand
         primary: "#2563eb",
         "primary-hover": "#1d4ed8",

@@ -4,7 +4,7 @@ import ContractsWorkspace from "@/components/contracts/contracts-workspace";
 export const metadata: Metadata = {
   title: "Contracts — ContractRipple",
   description:
-    "Create projects and contracts, upload baseline and candidate OpenAPI specifications, and review classified compatibility risks with JSON Pointer evidence.",
+    "Compare OpenAPI specifications, review classified compatibility risks with JSON Pointer evidence, analyze source impact, export reports, and generate regression checks.",
 };
 
 export default function ContractsPage() {

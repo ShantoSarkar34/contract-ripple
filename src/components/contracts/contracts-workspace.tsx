@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   AnalysisRunDetailDto,
   AnalysisRunDto,
@@ -10,10 +10,14 @@ import type {
 } from "@contract-ripple/shared";
 import { API_BASE_URL, ApiRequestError, api, describeErrorDetails } from "@/lib/api";
 import ComparisonResults from "./comparison-results";
+import RegressionSuggestions from "./regression-suggestions";
 import SourceImpactPanel from "./source-impact-panel";
 
 type LoadState = "idle" | "loading" | "ready" | "error";
 type SubmitError = { message: string; details: string[] };
+
+/** Local mirror of the shared default; keeps the frontend's type-only shared import. */
+const HISTORY_PAGE_SIZE = 20;
 
 function toSubmitError(error: unknown): SubmitError {
   if (error instanceof ApiRequestError) {
@@ -80,6 +84,11 @@ export default function ContractsWorkspace() {
   const [analysis, setAnalysis] = useState<AnalysisRunDetailDto | null>(null);
   const [history, setHistory] = useState<AnalysisRunDto[]>([]);
   const [historyState, setHistoryState] = useState<LoadState>("idle");
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyNextCursor, setHistoryNextCursor] = useState<string | null>(null);
+  const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
+  const [historyError, setHistoryError] = useState<SubmitError | null>(null);
+  const selectedProjectRef = useRef("");
 
   async function reloadProjects(): Promise<void> {
     try {
@@ -138,14 +147,29 @@ export default function ContractsWorkspace() {
   }
 
   async function reloadHistory(projectId: string): Promise<void> {
+    setHistoryState("loading");
+    setHistoryError(null);
     try {
-      const response = await api.listComparisons(projectId);
+      const response = await api.listComparisons(projectId, { limit: HISTORY_PAGE_SIZE });
+      if (selectedProjectRef.current !== projectId) {
+        return;
+      }
       setHistory(response.analyses);
+      setHistoryTotal(response.totalCount);
+      setHistoryNextCursor(response.nextCursor);
       setHistoryState("ready");
-    } catch {
+    } catch (error) {
+      if (selectedProjectRef.current !== projectId) {
+        return;
+      }
+      setHistoryError(toSubmitError(error));
       setHistoryState("error");
     }
   }
+
+  useEffect(() => {
+    selectedProjectRef.current = selectedProjectId;
+  }, [selectedProjectId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -218,14 +242,19 @@ export default function ContractsWorkspace() {
       }
 
       try {
-        const response = await api.listComparisons(selectedProjectId);
+        const response = await api.listComparisons(selectedProjectId, {
+          limit: HISTORY_PAGE_SIZE,
+        });
         if (cancelled) {
           return;
         }
         setHistory(response.analyses);
+        setHistoryTotal(response.totalCount);
+        setHistoryNextCursor(response.nextCursor);
         setHistoryState("ready");
-      } catch {
+      } catch (error) {
         if (!cancelled) {
+          setHistoryError(toSubmitError(error));
           setHistoryState("error");
         }
       }
@@ -276,6 +305,7 @@ export default function ContractsWorkspace() {
   }, [selectedContractId]);
 
   const selectedContract = contracts.find((contract) => contract.id === selectedContractId) ?? null;
+  const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null;
 
   function handleSelectProject(projectId: string) {
     setSelectedProjectId(projectId);
@@ -283,6 +313,11 @@ export default function ContractsWorkspace() {
     setSubmitError(null);
     setContractsState("loading");
     setHistoryState("loading");
+    setHistory([]);
+    setHistoryTotal(0);
+    setHistoryNextCursor(null);
+    setHistoryError(null);
+    setHistoryLoadingMore(false);
   }
 
   function handleSelectContract(contractId: string) {
@@ -299,13 +334,18 @@ export default function ContractsWorkspace() {
     }
     setCreatingProject(true);
     setProjectError(null);
-    setAnalysis(null);
-    setContractsState("loading");
-    setHistoryState("loading");
     try {
       const project = await api.createProject({ name: newProjectName.trim() });
       setNewProjectName("");
       await reloadProjects();
+      setAnalysis(null);
+      setContractsState("loading");
+      setHistoryState("loading");
+      setHistory([]);
+      setHistoryTotal(0);
+      setHistoryNextCursor(null);
+      setHistoryError(null);
+      setHistoryLoadingMore(false);
       setSelectedProjectId(project.id);
     } catch (error) {
       setProjectError(toSubmitError(error));
@@ -418,6 +458,41 @@ export default function ContractsWorkspace() {
     }
   }
 
+  async function handleLoadMoreHistory(): Promise<void> {
+    const projectId = selectedProjectId;
+    const cursor = historyNextCursor;
+    if (!projectId || !cursor || historyLoadingMore) {
+      return;
+    }
+
+    setHistoryLoadingMore(true);
+    setHistoryError(null);
+    try {
+      const response = await api.listComparisons(projectId, {
+        limit: HISTORY_PAGE_SIZE,
+        cursor,
+      });
+      if (selectedProjectRef.current !== projectId) {
+        return;
+      }
+      setHistory((current) => {
+        const known = new Set(current.map((run) => run.id));
+        return [...current, ...response.analyses.filter((run) => !known.has(run.id))];
+      });
+      setHistoryTotal(response.totalCount);
+      setHistoryNextCursor(response.nextCursor);
+      setHistoryState("ready");
+    } catch (error) {
+      if (selectedProjectRef.current === projectId) {
+        setHistoryError(toSubmitError(error));
+      }
+    } finally {
+      if (selectedProjectRef.current === projectId) {
+        setHistoryLoadingMore(false);
+      }
+    }
+  }
+
   function handleFile(
     event: React.ChangeEvent<HTMLInputElement>,
     setContent: (value: string) => void,
@@ -448,8 +523,8 @@ export default function ContractsWorkspace() {
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-400">
               Create a project, upload baseline and candidate OpenAPI contracts, and review every
-              classified difference with its JSON Pointer evidence. Results below come from the real
-              comparison engine and are stored in the database.
+              classified difference with its JSON Pointer evidence. Then connect changed operations
+              to frontend source files in the evidence-backed impact map.
             </p>
           </div>
           <div className="text-right text-xs">
@@ -475,6 +550,39 @@ export default function ContractsWorkspace() {
           </div>
         </div>
       </header>
+
+      <div className="sticky top-14 z-30 -mx-4 mb-6 border-y border-slate-200/70 bg-background/85 px-4 py-2 backdrop-blur md:-mx-8 md:px-8 dark:border-slate-800/70">
+        <nav
+          aria-label="Workspace context"
+          className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400"
+        >
+          <span className="font-semibold uppercase tracking-wide text-foreground">Workspace</span>
+          {selectedProject ? (
+            <span className="font-medium text-foreground">{selectedProject.name}</span>
+          ) : (
+            <span>No project selected</span>
+          )}
+          {selectedContract ? (
+            <>
+              <span aria-hidden="true">·</span>
+              <span>{selectedContract.name}</span>
+            </>
+          ) : null}
+          {analysis ? (
+            <span className="ml-auto flex items-center gap-1">
+              <a href="#comparison-report" className="btn-ghost px-2 py-1 text-xs">
+                Comparison
+              </a>
+              <a href="#impact-map" className="btn-ghost px-2 py-1 text-xs">
+                Impact map
+              </a>
+              <a href="#regression-suggestions" className="btn-ghost px-2 py-1 text-xs">
+                Regression checks
+              </a>
+            </span>
+          ) : null}
+        </nav>
+      </div>
 
       {readiness === "down" ? (
         <div className="mb-6 rounded-md border border-warning/30 bg-warning-light p-3 text-sm text-warning">
@@ -628,35 +736,92 @@ export default function ContractsWorkspace() {
             ) : null}
           </section>
 
-          {selectedProjectId && history.length > 0 ? (
-            <section className="card p-4">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                History
-              </h2>
-              {historyState === "loading" ? (
-                <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">Loading…</p>
-              ) : (
-                <ul className="mt-3 space-y-1">
-                  {history.map((run) => (
-                    <li key={run.id}>
-                      <button
-                        type="button"
-                        onClick={() => void handleOpenAnalysis(run.id)}
-                        className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
-                      >
-                        <span className="font-medium text-foreground">
-                          {run.baselineVersionLabel ?? "baseline"} →{" "}
-                          {run.candidateVersionLabel ?? "candidate"}
-                        </span>
-                        <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
-                          {run.totalFindings} changes · {run.potentiallyBreakingCount} potentially
-                          breaking
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+          {selectedProjectId ? (
+            <section
+              className="card p-4"
+              aria-busy={historyState === "loading" || historyState === "idle"}
+            >
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Saved history
+                </h2>
+                {historyState === "ready" && historyTotal > 0 ? (
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    {history.length} of {historyTotal}
+                  </span>
+                ) : null}
+              </div>
+
+              {historyState === "loading" || historyState === "idle" ? (
+                <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+                  Loading saved comparisons…
+                </p>
+              ) : null}
+
+              {historyState === "error" && historyError ? (
+                <div className="mt-3">
+                  <ErrorNotice
+                    error={historyError}
+                    onRetry={() => void reloadHistory(selectedProjectId)}
+                  />
+                </div>
+              ) : null}
+
+              {historyState === "ready" && history.length === 0 ? (
+                <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+                  No saved comparisons yet. Run one above and it will appear here.
+                </p>
+              ) : null}
+
+              {history.length > 0 ? (
+                <>
+                  <ul className="mt-3 space-y-1">
+                    {history.map((run) => (
+                      <li key={run.id}>
+                        <button
+                          type="button"
+                          onClick={() => void handleOpenAnalysis(run.id)}
+                          aria-current={run.id === analysis?.id ? "true" : undefined}
+                          className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 ${
+                            run.id === analysis?.id
+                              ? "bg-primary-light text-primary"
+                              : ""
+                          }`}
+                        >
+                          <span className="block font-medium">
+                            {run.label ??
+                              `${run.baselineVersionLabel ?? "baseline"} → ${
+                                run.candidateVersionLabel ?? "candidate"
+                              }`}
+                          </span>
+                          <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
+                            {new Date(run.createdAt).toLocaleString()} · {run.totalFindings}{" "}
+                            changes · {run.potentiallyBreakingCount} potentially breaking
+                            {run.truncated ? " · truncated" : ""}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+
+                  {historyError ? (
+                    <div className="mt-3">
+                      <ErrorNotice error={historyError} />
+                    </div>
+                  ) : null}
+
+                  {historyNextCursor ? (
+                    <button
+                      type="button"
+                      className="btn-secondary mt-3 w-full"
+                      disabled={historyLoadingMore}
+                      onClick={() => void handleLoadMoreHistory()}
+                    >
+                      {historyLoadingMore ? "Loading…" : "Load more"}
+                    </button>
+                  ) : null}
+                </>
+              ) : null}
             </section>
           ) : null}
         </aside>
@@ -853,6 +1018,13 @@ export default function ContractsWorkspace() {
                 <SourceImpactPanel
                   key={`${selectedProjectId}:${analysis.id}`}
                   projectId={selectedProjectId}
+                  analysis={analysis}
+                />
+              ) : null}
+
+              {analysis ? (
+                <RegressionSuggestions
+                  key={`regression:${analysis.id}`}
                   analysis={analysis}
                 />
               ) : null}

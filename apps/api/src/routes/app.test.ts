@@ -11,7 +11,7 @@ import type {
   ProjectDto,
   ReadyResponse,
 } from "@contract-ripple/shared";
-import { createApp } from "../app.js";
+import { createApp } from "../create-app.js";
 import { MemoryRepository } from "../db/memory-repository.js";
 import {
   baselinePetJson,

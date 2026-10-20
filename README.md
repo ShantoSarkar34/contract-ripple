@@ -2,15 +2,18 @@
 
 ContractRipple is a developer tool for reviewing API contract changes and understanding their
 potential impact on frontend integrations. It compares OpenAPI specifications, classifies
-potentially breaking changes, and (in later phases) analyzes frontend source code to surface
-evidence-backed impact.
+potentially breaking changes, analyzes frontend source code for affected calls, and visualizes
+the evidence-backed relationships.
 
-> **Status:** Phase 4. The OpenAPI engine is wired to an Express API with
+> **Status:** Phase 6. The OpenAPI engine is wired to an Express API with
 > PostgreSQL persistence, and the `/contracts` workspace runs real comparisons,
-> shows classified findings with JSON Pointer evidence, and analyzes ZIP/GitHub
-> source for affected integrations with file/line evidence. The landing page
-> (`/`) still renders clearly labeled demo content. The impact graph, reports,
-> and authentication are not implemented yet.
+> shows classified findings in a filterable table with JSON Pointer evidence,
+> analyzes ZIP/GitHub source for affected integrations with file/line evidence,
+> renders an evidence-backed operation→file impact graph with an accessible
+> relationships view, paginates saved history, downloads JSON/Markdown reports,
+> and derives regression review prompts from persisted findings. The landing
+> page (`/`) still renders clearly labeled demo content. Authentication and
+> ownership checks are not implemented yet.
 
 ## Stack
 
@@ -20,6 +23,7 @@ evidence-backed impact.
 - **Shared:** framework-agnostic types (`packages/shared`).
 - **Engine:** standalone OpenAPI comparison engine (`packages/engine`).
 - **Source analysis:** TypeScript AST matching (`packages/source-analysis`).
+- **Impact graph:** deterministic graph construction (`packages/impact-graph`).
 - **Package manager:** npm (workspaces). Commit `package-lock.json`; do not introduce a second lockfile.
 
 ## Repository layout
@@ -32,13 +36,14 @@ contract-ripple/            # git repo root (frontend + workspaces)
 │   └── lib/
 ├── apps/
 │   └── api/                # Express API (routes, services, repositories)
-│       ├── src/
+│       ├── src/            # services include reports + regression suggestions
 │       └── prisma/         # schema + migrations
 ├── packages/
 │   ├── engine/             # OpenAPI parse/validate/normalize/compare/classify
 │   ├── source-analysis/    # TypeScript AST call detection + operation matching
+│   ├── impact-graph/       # deterministic operation→source graph builder
 │   └── shared/             # shared types and zod request schemas
-├── docs/                   # plan, architecture, design review, engine/API/source docs
+├── docs/                   # plan, architecture, design review, engine/API/source/graph/report docs
 ├── AGENTS.md               # permanent project instructions
 └── .env.example
 ```
@@ -89,10 +94,10 @@ npm run api:dev
 | Script | Purpose |
 | --- | --- |
 | `npm run dev` | Start the Next.js dev server (Webpack) |
-| `npm run build` | Build shared, then production-build the frontend (Webpack) |
+| `npm run build` | Build shared + impact graph, then production-build the frontend (Webpack) |
 | `npm run start` | Start the production frontend |
 | `npm run lint` | ESLint on the frontend source |
-| `npm run typecheck` | Build shared + engine + source-analysis, type-check the frontend, type-check the API |
+| `npm run typecheck` | Build shared + engine + source-analysis + impact-graph, type-check the frontend, type-check the API |
 | `npm test` | Run unit tests with Vitest (DB integration test skipped) |
 | `npm run test:watch` | Vitest watch mode |
 | `npm run api:dev` | Build shared/engine/source-analysis, then start the Express API in watch mode (loads `apps/api/.env`) |
@@ -100,8 +105,9 @@ npm run api:dev
 | `npm run build:shared` | Build the shared types package |
 | `npm run build:engine` | Build the OpenAPI engine |
 | `npm run build:source` | Build the source-analysis package |
+| `npm run build:graph` | Build the impact-graph package |
 | `npm run build:api` | Build shared + engine + source-analysis + API |
-| `npm run build:all` | Build frontend + shared + engine + source-analysis + API |
+| `npm run build:all` | Build frontend + impact graph + shared + engine + source-analysis + API |
 | `npm run db:validate` | Validate the Prisma schema |
 | `npm run db:generate` | Generate the Prisma client |
 | `npm run db:migrate` | Create/apply a dev migration (`prisma migrate dev`) |
@@ -150,6 +156,44 @@ method and path, generated clients, or GraphQL/WebSocket traffic. Results are
 evidence-backed matches, not a guarantee of complete impact discovery. See
 `docs/source-analysis.md`.
 
+## Impact graph
+
+When a source snapshot is selected, the `/contracts` workspace renders an
+impact map: changed operations on the left, affected source files on the right,
+and one line per persisted match. Selecting a node or relationship shows the
+comparison findings or the exact source evidence (file, line, column, snippet).
+
+- The graph is built in the browser by `packages/impact-graph` from the stored
+  comparison findings and source impacts. It adds no API endpoint and no
+  database table.
+- An edge exists only when a persisted source match names the same normalized
+  method + path as a changed operation. Unmatched findings and impacts are
+  reported as limitations, never drawn as speculative links.
+- Filters cover risk, category, method, confidence, and free text. Defaults are
+  200 operations, 400 files, 800 relationships, and 20 evidence entries per
+  relation; truncation is explicit.
+- A Map/Relationships toggle exposes the same evidence as a semantic table for
+  keyboard and screen-reader users. Operations with no match stay visible.
+
+See `docs/impact-graph.md` for the model, construction rules, library
+evaluation, limits, and known limitations.
+
+## Reports and regression checks
+
+The comparison report header downloads the persisted analysis as JSON or
+Markdown. Both exports include findings, limitations, notes, and the latest
+source snapshot attached to that comparison; the JSON form is complete and the
+Markdown form is readable, with summary tables, source evidence, and before/after
+code blocks.
+
+The workspace also renders operation-scoped regression suggestions derived from
+the findings. They are review prompts, not generated executable tests or claims
+that the API is broken. Nothing is invented for findings without a method and
+path. Saved history loads in pages of 20 with a validated cursor.
+
+See `docs/reports.md` for the report model, suggestion rules, latest-snapshot
+policy, limits, and tests.
+
 ## Environment variables
 
 Frontend (`.env.local`, see `.env.example`):
@@ -187,8 +231,10 @@ Base URL `/api/v1`. All responses are JSON; errors use a consistent
   `GET /contracts/:contractId`
 - `POST /contracts/:contractId/versions` (validates before saving),
   `GET /contracts/:contractId/versions`, `GET /versions/:versionId`
-- `POST /projects/:projectId/comparisons`, `GET /projects/:projectId/comparisons`,
+- `POST /projects/:projectId/comparisons`,
+  `GET /projects/:projectId/comparisons` (cursor pagination),
   `GET /comparisons/:comparisonId`
+- `GET /comparisons/:comparisonId/report?format=json|markdown` (download)
 - `POST /projects/:projectId/source/zip` (multipart), `POST /projects/:projectId/source/github`,
   `GET /projects/:projectId/source`, `GET /source/:snapshotId`, `GET /github/status`
 
@@ -204,8 +250,9 @@ Unit and route tests use Vitest and live next to the code they cover:
 - `packages/shared/src/*.test.ts` — error guards and API request schemas.
 - `packages/engine/src/*.test.ts` — parsing, validation, comparison, classification, security.
 - `packages/source-analysis/src/*.test.ts` — AST call detection, path matching, template paths, limits.
-- `apps/api/src/services/*.test.ts` — project/contract/comparison/source services with an in-memory repository.
-- `apps/api/src/routes/app.test.ts`, `apps/api/src/routes/source.test.ts` — real HTTP requests against an ephemeral server.
+- `packages/impact-graph/src/*.test.ts` — graph grouping, matching, filters, limits, evidence, and deterministic ordering.
+- `apps/api/src/services/*.test.ts` — project/contract/comparison/source/report services with an in-memory repository; regression-suggestion grouping, evidence bounds, and stable ordering.
+- `apps/api/src/routes/app.test.ts`, `apps/api/src/routes/source.test.ts`, `apps/api/src/routes/reports.test.ts` — real HTTP requests against an ephemeral server, including pagination and JSON/Markdown downloads.
 
 ```bash
 npm test
@@ -213,9 +260,12 @@ npm test
 
 The engine tests cover parsing/validation failures, all required change classes,
 references, circular references, external references, deterministic ordering,
-JSON Pointer escaping, input limits, and security cases. The API tests cover
-input validation, engine error mapping, persistence DTOs, cross-project checks,
-ZIP traversal and size limits, GitHub error mapping, and the full project →
+JSON Pointer escaping, input limits, and security cases. The graph tests cover
+grouping, normalized matching, unmatched evidence, filters, limits, deterministic
+ordering, and the no-missing-endpoints guarantee. The API tests cover input
+validation, engine error mapping, persistence DTOs, cross-project checks, ZIP
+traversal and size limits, GitHub error mapping, saved-history pagination,
+report downloads, regression-suggestion generation, and the full project →
 contract → version → comparison → source-analysis flow.
 
 One PostgreSQL integration test is skipped by default. Run it against a
@@ -234,10 +284,18 @@ source archive, reads the snapshot back, and deletes the project at the end.
 
 ## Deployment
 
-- **Frontend:** Vercel at the repository root (current live site: `contractripple.vercel.app`).
-- **Backend:** deploy `apps/api` separately to a Node-capable host with PostgreSQL.
-- Set environment variables per environment; use HTTPS and explicit CORS origins.
-- Run Prisma migrations deliberately, never automatically on server start.
+- **Frontend:** Vercel project `contractripple`, rooted at the repository root
+  (current live site: `contractripple.vercel.app`).
+- **Backend:** Vercel project `contractripple-api`, rooted at `apps/api`
+  (current live API: `contractripple-api.vercel.app/api/v1`).
+- **Database:** managed PostgreSQL; migrations are run deliberately with
+  `npm run db:deploy`, never automatically on server start.
+- Set `NEXT_PUBLIC_API_BASE_URL` on the frontend, and `DATABASE_URL`,
+  `CORS_ORIGINS`, and the optional `GITHUB_TOKEN` on the API. Use HTTPS and
+  exact CORS origins.
+- Vercel Functions limit request bodies to 4.5 MB, below the application's
+  10 MiB ZIP limit. See `docs/deployment.md` for the full deployment topology,
+  CLI commands, limits, and security status.
 
 ## Documentation
 
@@ -247,6 +305,9 @@ source archive, reads the snapshot back, and deletes the project at the end.
 - `docs/api.md` — REST endpoint reference, error codes, and limits.
 - `docs/engine.md` — OpenAPI engine interface, rules, and limitations.
 - `docs/source-analysis.md` — source detection, matching, ZIP/GitHub security, and limits.
+- `docs/impact-graph.md` — graph model, construction rules, limits, accessibility, and library evaluation.
+- `docs/reports.md` — report exports, regression suggestions, latest-snapshot policy, and limits.
+- `docs/deployment.md` — Vercel frontend/API topology, environment variables, limits, and security status.
 - `docs/design-review.md` — UI review and improvement priorities.
 
 ## Demo data

@@ -1,12 +1,14 @@
 import { Router } from "express";
 import {
   createComparisonRequestSchema,
-  type ListAnalysesResponse,
+  listComparisonsQuerySchema,
+  reportQuerySchema,
 } from "@contract-ripple/shared";
 import type { Repository } from "../db/types.js";
 import { asyncHandler } from "../middleware/async-handler.js";
 import { parseWithSchema } from "../middleware/validate.js";
 import { createComparison, getComparison, listComparisons } from "../services/comparisons.js";
+import { getComparisonReport, renderMarkdownReport } from "../services/reports.js";
 import { requiredParam } from "./params.js";
 
 export function createComparisonsRouter(repository: Repository): Router {
@@ -28,9 +30,40 @@ export function createComparisonsRouter(repository: Repository): Router {
   router.get(
     "/projects/:projectId/comparisons",
     asyncHandler(async (request, response) => {
-      const analyses = await listComparisons(repository, requiredParam(request, "projectId"));
-      const body: ListAnalysesResponse = { analyses };
+      const query = parseWithSchema(listComparisonsQuerySchema, request.query);
+      const body = await listComparisons(
+        repository,
+        requiredParam(request, "projectId"),
+        query,
+      );
       response.status(200).json(body);
+    }),
+  );
+
+  router.get(
+    "/comparisons/:comparisonId/report",
+    asyncHandler(async (request, response) => {
+      const query = parseWithSchema(reportQuerySchema, request.query);
+      const report = await getComparisonReport(
+        repository,
+        requiredParam(request, "comparisonId"),
+      );
+      const safeId = report.comparison.id.replace(/[^a-zA-Z0-9_-]/g, "");
+      response.setHeader("Cache-Control", "no-store");
+
+      if (query.format === "markdown") {
+        response
+          .status(200)
+          .attachment(`contract-ripple-${safeId}.md`)
+          .type("text/markdown")
+          .send(renderMarkdownReport(report));
+        return;
+      }
+
+      response
+        .status(200)
+        .attachment(`contract-ripple-${safeId}.json`)
+        .json(report);
     }),
   );
 

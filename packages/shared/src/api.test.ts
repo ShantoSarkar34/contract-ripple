@@ -9,7 +9,10 @@ import {
   createProjectRequestSchema,
   githubSourceFieldsSchema,
   MAX_CONTRACT_BYTES,
+  MAX_HISTORY_PAGE_SIZE,
   MAX_SOURCE_ARCHIVE_BYTES,
+  listComparisonsQuerySchema,
+  reportQuerySchema,
   updateProjectRequestSchema,
   utf8ByteLength,
   zipSourceFieldsSchema,
@@ -135,5 +138,39 @@ describe("source analysis schemas", () => {
     expect(zipSourceFieldsSchema.safeParse({}).success).toBe(true);
     expect(zipSourceFieldsSchema.safeParse({ analysisRunId: "run-1" }).success).toBe(true);
     expect(zipSourceFieldsSchema.safeParse({ analysisRunId: "" }).success).toBe(false);
+  });
+});
+
+describe("history and report query schemas", () => {
+  it("defaults history to the first page and coerces a numeric limit", () => {
+    const defaults = listComparisonsQuerySchema.safeParse({});
+    expect(defaults.success).toBe(true);
+    if (defaults.success) {
+      expect(defaults.data).toEqual({ limit: 20 });
+    }
+
+    const explicit = listComparisonsQuerySchema.safeParse({ limit: "35", cursor: "run-1" });
+    expect(explicit.success).toBe(true);
+    if (explicit.success) {
+      expect(explicit.data).toEqual({ limit: 35, cursor: "run-1" });
+    }
+  });
+
+  it("rejects invalid or oversized history limits", () => {
+    expect(listComparisonsQuerySchema.safeParse({ limit: "0" }).success).toBe(false);
+    expect(
+      listComparisonsQuerySchema.safeParse({ limit: String(MAX_HISTORY_PAGE_SIZE + 1) }).success,
+    ).toBe(false);
+    expect(listComparisonsQuerySchema.safeParse({ limit: "many" }).success).toBe(false);
+  });
+
+  it("defaults report format to JSON and accepts Markdown", () => {
+    const defaults = reportQuerySchema.safeParse({});
+    expect(defaults.success).toBe(true);
+    if (defaults.success) {
+      expect(defaults.data).toEqual({ format: "json" });
+    }
+    expect(reportQuerySchema.safeParse({ format: "markdown" }).success).toBe(true);
+    expect(reportQuerySchema.safeParse({ format: "html" }).success).toBe(false);
   });
 });

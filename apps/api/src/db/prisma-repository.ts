@@ -26,7 +26,9 @@ import {
 import { toContractSummary, toStringArray } from "./json.js";
 import type {
   AnalysisRunDetailRecord,
+  AnalysisRunPageRecord,
   AnalysisRunRecord,
+  AnalysisRunScopeRecord,
   AnalysisRunWithVersions,
   ContractRecord,
   ContractRecordWithCount,
@@ -38,6 +40,7 @@ import type {
   CreateProjectInput,
   CreateSourceSnapshotInput,
   FindingRecord,
+  ListAnalysisRunsPageOptions,
   ProjectRecord,
   ProjectRecordWithCount,
   Repository,
@@ -404,10 +407,17 @@ export class PrismaRepository implements Repository {
     };
   }
 
+  async getAnalysisRunScope(id: string): Promise<AnalysisRunScopeRecord | null> {
+    return this.prisma.analysisRun.findUnique({
+      where: { id },
+      select: { id: true, projectId: true },
+    });
+  }
+
   async listAnalysisRunsByProject(projectId: string): Promise<AnalysisRunWithVersions[]> {
     const rows = (await this.prisma.analysisRun.findMany({
       where: { projectId },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       include: { baselineVersion: true, candidateVersion: true },
     })) as AnalysisRowWithVersions[];
 
@@ -416,6 +426,37 @@ export class PrismaRepository implements Repository {
       baselineVersion: mapVersion(row.baselineVersion),
       candidateVersion: mapVersion(row.candidateVersion),
     }));
+  }
+
+  async listAnalysisRunsByProjectPage(
+    projectId: string,
+    options: ListAnalysisRunsPageOptions,
+  ): Promise<AnalysisRunPageRecord> {
+    const [totalCount, rawRows] = await Promise.all([
+      this.prisma.analysisRun.count({ where: { projectId } }),
+      this.prisma.analysisRun.findMany({
+        where: { projectId },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: options.limit + 1,
+        ...(options.cursor ? { cursor: { id: options.cursor }, skip: 1 } : {}),
+        include: { baselineVersion: true, candidateVersion: true },
+      }),
+    ]);
+    const rows = rawRows as AnalysisRowWithVersions[];
+
+    const hasMore = rows.length > options.limit;
+    const page = hasMore ? rows.slice(0, options.limit) : rows;
+    const last = page[page.length - 1];
+
+    return {
+      runs: page.map((row) => ({
+        ...mapAnalysisRun(row),
+        baselineVersion: mapVersion(row.baselineVersion),
+        candidateVersion: mapVersion(row.candidateVersion),
+      })),
+      totalCount,
+      nextCursor: hasMore && last ? last.id : null,
+    };
   }
 
   async createSourceSnapshot(input: CreateSourceSnapshotInput): Promise<SourceSnapshotRecord> {
@@ -483,7 +524,22 @@ export class PrismaRepository implements Repository {
   async listSourceSnapshotsByProject(projectId: string): Promise<SourceSnapshotWithCount[]> {
     const rows = (await this.prisma.sourceSnapshot.findMany({
       where: { projectId },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      include: { _count: { select: { impacts: true } } },
+    })) as SourceSnapshotRowWithCount[];
+
+    return rows.map((row) => ({
+      ...mapSourceSnapshot(row),
+      impactCount: row._count.impacts,
+    }));
+  }
+
+  async listSourceSnapshotsByAnalysisRun(
+    analysisRunId: string,
+  ): Promise<SourceSnapshotWithCount[]> {
+    const rows = (await this.prisma.sourceSnapshot.findMany({
+      where: { analysisRunId },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       include: { _count: { select: { impacts: true } } },
     })) as SourceSnapshotRowWithCount[];
 

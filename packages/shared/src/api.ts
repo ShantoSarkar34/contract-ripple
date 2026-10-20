@@ -39,11 +39,18 @@ export type SourceType = (typeof SOURCE_TYPES)[number];
 export const SOURCE_CONFIDENCES = ["high", "medium", "low"] as const;
 export type SourceConfidence = (typeof SOURCE_CONFIDENCES)[number];
 
+export const REPORT_FORMATS = ["json", "markdown"] as const;
+export type ReportFormat = (typeof REPORT_FORMATS)[number];
+
 /** Engine input limits, mirrored from the engine defaults. */
 export const MAX_CONTRACT_BYTES = 5 * 1024 * 1024;
 
 /** Maximum ZIP upload accepted for source analysis. */
 export const MAX_SOURCE_ARCHIVE_BYTES = 10 * 1024 * 1024;
+
+/** Saved comparison history is paginated; these bounds apply to the API and UI. */
+export const DEFAULT_HISTORY_PAGE_SIZE = 20;
+export const MAX_HISTORY_PAGE_SIZE = 50;
 
 /* -------------------------------------------------------------------------- */
 /* Request schemas                                                            */
@@ -89,6 +96,22 @@ export const createComparisonRequestSchema = z.object({
   label: z.string().trim().max(200).optional(),
 });
 export type CreateComparisonRequest = z.infer<typeof createComparisonRequestSchema>;
+
+export const listComparisonsQuerySchema = z.object({
+  cursor: z.string().trim().min(1).max(200).optional(),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(MAX_HISTORY_PAGE_SIZE)
+    .default(DEFAULT_HISTORY_PAGE_SIZE),
+});
+export type ListComparisonsQuery = z.infer<typeof listComparisonsQuerySchema>;
+
+export const reportQuerySchema = z.object({
+  format: z.enum(REPORT_FORMATS).default("json"),
+});
+export type ReportQuery = z.infer<typeof reportQuerySchema>;
 
 export const githubSourceFieldsSchema = z.object({
   repository: z.string().trim().min(1).max(300),
@@ -165,6 +188,23 @@ export type FindingDto = {
   after: string | null;
 };
 
+/**
+ * A review prompt derived from findings for one changed operation. It is not
+ * generated test code and does not claim that the operation is broken.
+ */
+export type RegressionSuggestionDto = {
+  id: string;
+  method: string;
+  path: string;
+  operationId: string | null;
+  risk: RiskLevel;
+  title: string;
+  rationale: string;
+  findingIds: string[];
+  evidence: string[];
+  suggestedChecks: string[];
+};
+
 export type AnalysisRunDto = {
   id: string;
   projectId: string;
@@ -188,6 +228,7 @@ export type AnalysisRunDetailDto = AnalysisRunDto & {
   candidate: ContractSummaryDto;
   limitations: string[];
   findings: FindingDto[];
+  regressionSuggestions: RegressionSuggestionDto[];
 };
 
 export type ContractSummaryDto = {
@@ -210,7 +251,11 @@ export type ReadyResponse = {
 export type ListProjectsResponse = { projects: ProjectDto[] };
 export type ListContractsResponse = { contracts: ContractDto[] };
 export type ListVersionsResponse = { versions: ContractVersionDto[] };
-export type ListAnalysesResponse = { analyses: AnalysisRunDto[] };
+export type ListAnalysesResponse = {
+  analyses: AnalysisRunDto[];
+  nextCursor: string | null;
+  totalCount: number;
+};
 
 export type SourceImpactDto = {
   id: string;
@@ -256,6 +301,34 @@ export type SourceSnapshotDetailDto = SourceSnapshotDto & {
 };
 
 export type ListSourceSnapshotsResponse = { snapshots: SourceSnapshotDto[] };
+
+export type ReportSourceSnapshotDto = SourceSnapshotDto & {
+  impacts: SourceImpactDto[];
+};
+
+export type AnalysisReportSourceDto = {
+  availableSnapshotCount: number;
+  includedSnapshotId: string | null;
+  snapshot: ReportSourceSnapshotDto | null;
+};
+
+/**
+ * Downloadable report model. `comparison` holds the persisted summary counts;
+ * `findings` and `regressionSuggestions` are the complete persisted analysis.
+ */
+export type AnalysisReportDto = {
+  schemaVersion: "contract-ripple.report.v1";
+  generatedAt: string;
+  project: { id: string; name: string };
+  comparison: AnalysisRunDto;
+  baseline: ContractSummaryDto;
+  candidate: ContractSummaryDto;
+  findings: FindingDto[];
+  regressionSuggestions: RegressionSuggestionDto[];
+  sourceAnalysis: AnalysisReportSourceDto;
+  limitations: string[];
+  notes: string[];
+};
 
 export type GitHubStatusResponse = {
   configured: boolean;

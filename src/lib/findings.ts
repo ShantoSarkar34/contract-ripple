@@ -6,6 +6,18 @@ export const RISK_LABELS: Record<RiskLevel, string> = {
   unknown: "Unknown",
 };
 
+/** Deterministic display order for risk filters and graph sorting. */
+export const RISK_ORDER: readonly RiskLevel[] = [
+  "potentially_breaking",
+  "unknown",
+  "non_breaking",
+];
+
+/** ZIP entries can use Windows separators; show repository paths consistently. */
+export function displayPath(filePath: string): string {
+  return filePath.replace(/\\/g, "/");
+}
+
 export const RISK_BADGE_CLASSES: Record<RiskLevel, string> = {
   non_breaking: "bg-success-light text-success border border-success/20",
   potentially_breaking: "bg-danger-light text-danger border border-danger/20",
@@ -34,6 +46,18 @@ export const CATEGORY_LABELS: Record<FindingCategory, string> = {
   schema_property: "Schema property",
   reference: "Reference",
   combinator: "Composition",
+};
+
+export const CONFIDENCE_LABELS: Record<"high" | "medium" | "low", string> = {
+  high: "High",
+  medium: "Medium",
+  low: "Low",
+};
+
+export const CONFIDENCE_CLASSES: Record<"high" | "medium" | "low", string> = {
+  high: "text-success",
+  medium: "text-warning",
+  low: "text-slate-500 dark:text-slate-400",
 };
 
 /** HTTP method color tokens used by the findings list. */

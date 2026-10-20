@@ -40,14 +40,14 @@ See `docs/architecture.md` for boundaries and data flow.
 | **1** | Audit + foundation | audit report, `docs/development-plan.md`, `docs/architecture.md`, `docs/design-review.md`, scripts, env examples, Express/Prisma scaffold | **Done** |
 | **2** | OpenAPI engine | parsing, validation, comparison, classification, tests, clean engine interface | **Done** |
 | **3** | Backend + database | Prisma models, migrations, `/api/v1`, persistence, real frontend integration | **Done** |
-| **4** | Source analysis | AST matching, secure ZIP pipeline, real GitHub integration, evidence | **In review** |
-| **5** | Impact graph + UI | evidence-backed graph, filterable findings, accessible views | Planned |
-| **6** | Reports + history | saved history, JSON/readable exports, regression suggestions | Planned |
+| **4** | Source analysis | AST matching, secure ZIP pipeline, real GitHub integration, evidence | **Done** |
+| **5** | Impact graph + UI | evidence-backed graph, filterable findings, accessible views | **Done** |
+| **6** | Reports + history | saved history, JSON/readable exports, regression suggestions | **In review** |
 | **7** | Auth + security + deploy | sessions, authorization, IDOR tests, hardening, release checklist | Planned |
 
 Each phase ends with a completion report and stops. No phase starts automatically.
 
-## Phase 1 decisions (this phase)
+## Phase 1 decisions
 
 - **Monorepo migration is incremental.** The deployed Next.js app stays at the repository root so
   the live Vercel deployment keeps working. `apps/api` and `packages/shared` are added as npm
@@ -59,7 +59,7 @@ Each phase ends with a completion report and stops. No phase starts automaticall
 - **Backend scaffold only.** Health endpoint plus configuration and Prisma schema. No analysis
   engine, persistence models, authentication, GitHub integration, or source analysis yet.
 
-## Phase 2 decisions (this phase)
+## Phase 2 decisions
 
 - **Engine package:** `packages/engine` is a standalone npm workspace with no
   HTTP, database, auth, GitHub, ZIP, or graph dependencies. The public entry
@@ -87,7 +87,7 @@ Each phase ends with a completion report and stops. No phase starts automaticall
 See `docs/engine.md` for the full interface, classification table, and
 limitations.
 
-## Phase 3 decisions (this phase)
+## Phase 3 decisions
 
 - **Persistence models:** `Project`, `Contract`, `ContractVersion`,
   `AnalysisRun`, and `Finding` in PostgreSQL. `ContractVersion` stores the raw
@@ -123,7 +123,7 @@ limitations.
 
 See `docs/api.md` for the endpoint reference.
 
-## Phase 4 decisions (this phase)
+## Phase 4 decisions
 
 - **Separate source package:** `packages/source-analysis` owns TypeScript AST
   parsing, call detection, path matching, and evidence generation. The API layer
@@ -175,6 +175,108 @@ See `docs/source-analysis.md` and `docs/api.md` for details.
   repository cloning.
 - Background queues, per-user rate limits, or analysis caching.
 
+## Phase 5 decisions
+
+- **Standalone graph builder:** `packages/impact-graph` is dependency-free and
+  deterministic. It groups findings into operations, matches persisted source
+  impacts by normalized method + path, and emits evidence-bearing nodes and
+  edges. The UI never invents relationships; anything that cannot be graphed is
+  reported as a limitation.
+- **No graph API or table:** the graph is a client-side projection of
+  `AnalysisRunDetailDto.findings` and `SourceSnapshotDetailDto.impacts`. The
+  backend and Prisma schema are unchanged in this phase.
+- **Conservative key matching:** methods are lower-cased and trimmed; paths get
+  a leading slash, collapsed duplicate slashes, and no trailing slash (except
+  root). Backslashes are normalized so Windows-created ZIP paths match.
+- **Proof before drawing:** an edge exists only when a persisted `SourceImpact`
+  names a changed operation. A file node exists only through an edge. Risk is
+  the highest finding risk for the operation; confidence is the highest match
+  confidence for the relationship.
+- **Deterministic limits:** 200 operations, 400 files, 800 relationships, and 20
+  evidence entries per node/relationship. Limits are applied in that order so
+  no edge points at a dropped node, and every truncation is reported.
+- **Custom SVG instead of a graph library:** React Flow, d3-force, and Cytoscape
+  were evaluated. A small deterministic SVG layout keeps the client bundle
+  lean, produces a stable two-column layout, and pairs naturally with an
+  equivalent semantic table for keyboard and screen-reader users. Details are in
+  `docs/impact-graph.md`.
+- **Dense findings table:** the card-per-finding comparison list is replaced by
+  a filterable table (risk, category, method, search) with expandable evidence
+  rows and incremental "Show more". Long paths are truncated visually but
+  available through the title attribute and expanded evidence.
+- **Accessibility and shell polish:** the graph has a Map/Relationships toggle;
+  the relationships table is always the accessible equivalent. The workspace
+  gains a sticky context bar with section anchors, the navbar drops dead links
+  and gains a mobile menu, the loaded Geist font is applied, focus-visible
+  outlines are global, and Tailwind dark mode follows the same
+  `prefers-color-scheme` strategy as the CSS variables.
+- **Honest empty/partial states:** filters, unmatched findings/impacts, missing
+  source analysis, no matches, and truncation each have explicit text. The graph
+  never hides an unmatched operation behind a fabricated file edge.
+
+## Non-goals for Phase 5
+
+- Report export, saved-history pagination, and regression-test suggestions
+  (Phase 6).
+- Authentication, authorization, per-user ownership, and public deployment
+  hardening (Phase 7).
+- Graph editing, drag-and-drop, zoom/pan canvases, or a new graph database.
+- Runtime verification, code execution, or fetching additional source files.
+- Changing the frontend's repository location or Vercel deployment settings.
+- Replacing the landing page's clearly labeled demo content with fabricated
+  analysis results.
+
+## Phase 6 decisions
+
+- **Reports are generated from persisted records.** The JSON report is a
+  deterministic projection of the stored comparison, its findings, the
+  generated regression suggestions, and the latest source snapshot attached to
+  that comparison. There is no report table, background job, or stored file.
+- **JSON is the complete export; Markdown is the readable export.** Both are
+  downloaded from `GET /comparisons/:comparisonId/report`, with
+  `format=json|markdown`. The JSON export preserves all finding fields and
+  source impacts. Markdown includes the summary, suggestions, source evidence,
+  findings table, before/after evidence, limitations, and notes. See
+  `docs/reports.md`.
+- **Only the latest source snapshot is included.** A comparison can have
+  multiple ZIP/GitHub snapshots. Exporting all of them would duplicate evidence
+  and inflate downloads, so the report records how many snapshots exist and
+  includes the newest one. The source panel still exposes every snapshot.
+- **Regression suggestions are review prompts, not fabricated test code.**
+  Suggestions are grouped by normalized method + path from persisted findings.
+  The highest finding risk sets the suggestion risk; checks are derived from
+  the finding categories and change types. No expected status code, runtime
+  behavior, framework, or test file is invented. Findings without both method
+  and path are not turned into operation-level tests.
+- **Saved-history pagination is cursor-based.** `GET
+  /projects/:projectId/comparisons` accepts `limit` (1–50, default 20) and an
+  opaque `cursor` (the last comparison id). The response includes `nextCursor`
+  and `totalCount`. Ordering is `createdAt` descending with id as a stable
+  tie-breaker, so new comparisons do not shift pages.
+- **The client never rebuilds exports.** The report actions download the API's
+  JSON/Markdown response, so the frontend and downloaded report share the same
+  persisted data and suggestion algorithm. Object URLs are revoked after the
+  download starts.
+- **No schema migration.** History and source snapshots were already persisted.
+  Phase 6 adds repository read methods, DTO fields, API routes, UI states, and
+  tests only.
+- **No public data boundary change.** The API remains unauthenticated until
+  Phase 7. Export routes inherit the same lack of ownership checks and must not
+  receive real user data yet.
+
+## Non-goals for Phase 6
+
+- Authentication, authorization, per-user ownership, rate limiting, and public
+  deployment hardening (Phase 7).
+- Generated executable test files, framework-specific test syntax, running
+  tests, or asserting expected HTTP status codes not present in the findings.
+- Scheduled/emailed reports, share links, PDF generation, report tables,
+  object-storage archives, or background export jobs.
+- Including every historical source snapshot in one report.
+- Changing the frontend repository location or Vercel deployment settings.
+- Replacing the landing page's clearly labeled demo content with fabricated
+  analysis results.
+
 ## Non-goals for Phase 3
 
 - Authentication/authorization and per-user ownership.
@@ -222,6 +324,22 @@ See `docs/source-analysis.md` and `docs/api.md` for details.
 - **Static source analysis:** dynamic URLs, custom wrappers, generated clients,
   GraphQL/WebSockets, and runtime composition are out of scope. Results are
   evidence-backed matches, not a guarantee of complete impact discovery.
+- **Graph is a projection, not new evidence:** the impact graph can only show
+  relationships already present in persisted comparison/source records. Keep it
+  downstream of validation and matching; do not add inferred imports, call
+  graphs, or speculative edges to make the visualization denser.
+- **Graph limits and accessibility:** large analyses are capped at 200
+  operations, 400 files, and 800 relationships, with 20 evidence entries per
+  relation. Truncation is reported. The SVG map is pointer-oriented; preserve
+  the equivalent semantic table when changing the graph UI.
+- **Report scope:** exports are generated on demand from persisted records and
+  include only the latest source snapshot per comparison. Do not present older
+  snapshots as included, and do not turn review prompts into executable tests or
+  invented expected status codes. The API remains unauthenticated until Phase 7,
+  so reports must not contain real user data yet.
+- **Markdown escaping:** finding summaries, paths, and source snippets are
+  untrusted. Keep table/inline escaping and dynamic code-fence sizing when adding
+  report sections.
 - **GitHub credential scope:** Phase 4 uses one server-side `GITHUB_TOKEN`
   (installation token or fine-grained PAT). Per-user OAuth/App installation and
   token storage require the authentication/session work in Phase 7. Rotate the

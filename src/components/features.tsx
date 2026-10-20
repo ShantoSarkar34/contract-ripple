@@ -47,7 +47,10 @@ export default function Features() {
               key={feature.title}
               className="card p-6 hover:shadow-md transition-shadow"
             >
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-light text-primary mb-4 shrink-0">
+              <div
+                className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-light text-primary mb-4 shrink-0"
+                aria-hidden="true"
+              >
                 {feature.icon}
               </div>
               <h3 className="font-semibold text-foreground mb-2">{feature.title}</h3>

@@ -11,15 +11,16 @@
   },
   "scripts": {
     "dev": "next dev --webpack",
-    "build": "npm run build -w @contract-ripple/shared && next build --webpack",
+    "build": "npm run build -w @contract-ripple/shared && npm run build -w @contract-ripple/impact-graph && next build --webpack",
     "start": "next start",
     "lint": "eslint src",
-    "typecheck": "npm run build -w @contract-ripple/shared && npm run build -w @contract-ripple/engine && npm run build -w @contract-ripple/source-analysis && tsc --noEmit && npm run typecheck -w @contract-ripple/api",
+    "typecheck": "npm run build -w @contract-ripple/shared && npm run build -w @contract-ripple/engine && npm run build -w @contract-ripple/source-analysis && npm run build -w @contract-ripple/impact-graph && tsc --noEmit && npm run typecheck -w @contract-ripple/api",
     "test": "vitest run",
     "test:watch": "vitest",
     "build:shared": "npm run build -w @contract-ripple/shared",
     "build:engine": "npm run build -w @contract-ripple/engine",
     "build:source": "npm run build -w @contract-ripple/source-analysis",
+    "build:graph": "npm run build -w @contract-ripple/impact-graph",
     "build:api": "npm run build -w @contract-ripple/shared && npm run build -w @contract-ripple/engine && npm run build -w @contract-ripple/source-analysis && npm run build -w @contract-ripple/api",
     "build:all": "npm run build && npm run build:api",
     "api:dev": "npm run build:shared && npm run build:engine && npm run build:source && npm run dev -w @contract-ripple/api",
@@ -30,6 +31,7 @@
     "db:deploy": "npm run db:deploy -w @contract-ripple/api"
   },
   "dependencies": {
+    "@contract-ripple/impact-graph": "*",
     "@contract-ripple/shared": "*",
     "next": "16.4.2",
     "react": "19.3.0",

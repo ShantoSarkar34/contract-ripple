@@ -1,6 +1,8 @@
 import type {
   AnalysisRunDetailRecord,
+  AnalysisRunPageRecord,
   AnalysisRunRecord,
+  AnalysisRunScopeRecord,
   AnalysisRunWithVersions,
   ContractRecord,
   ContractRecordWithCount,
@@ -12,6 +14,7 @@ import type {
   CreateProjectInput,
   CreateSourceSnapshotInput,
   FindingRecord,
+  ListAnalysisRunsPageOptions,
   ProjectRecord,
   ProjectRecordWithCount,
   Repository,
@@ -25,6 +28,24 @@ import type {
 
 function clone<T>(value: T): T {
   return structuredClone(value);
+}
+
+function compareAnalysisRunsDesc(
+  left: AnalysisRunRecord,
+  right: AnalysisRunRecord,
+): number {
+  return (
+    right.createdAt.getTime() - left.createdAt.getTime() || right.id.localeCompare(left.id)
+  );
+}
+
+function compareSourceSnapshotsDesc(
+  left: SourceSnapshotRecord,
+  right: SourceSnapshotRecord,
+): number {
+  return (
+    right.createdAt.getTime() - left.createdAt.getTime() || right.id.localeCompare(left.id)
+  );
 }
 
 /**
@@ -251,10 +272,15 @@ export class MemoryRepository implements Repository {
     };
   }
 
+  async getAnalysisRunScope(id: string): Promise<AnalysisRunScopeRecord | null> {
+    const run = this.analysisRuns.get(id);
+    return run ? { id: run.id, projectId: run.projectId } : null;
+  }
+
   async listAnalysisRunsByProject(projectId: string): Promise<AnalysisRunWithVersions[]> {
     return [...this.analysisRuns.values()]
       .filter((run) => run.projectId === projectId)
-      .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+      .sort(compareAnalysisRunsDesc)
       .map((run) => {
         const baselineVersion = this.versions.get(run.baselineVersionId);
         const candidateVersion = this.versions.get(run.candidateVersionId);
@@ -267,6 +293,34 @@ export class MemoryRepository implements Repository {
           candidateVersion: clone(candidateVersion),
         };
       });
+  }
+
+  async listAnalysisRunsByProjectPage(
+    projectId: string,
+    options: ListAnalysisRunsPageOptions,
+  ): Promise<AnalysisRunPageRecord> {
+    const runs = await this.listAnalysisRunsByProject(projectId);
+    const totalCount = runs.length;
+
+    let start = 0;
+    if (options.cursor) {
+      const cursorIndex = runs.findIndex((run) => run.id === options.cursor);
+      if (cursorIndex < 0) {
+        return { runs: [], totalCount, nextCursor: null };
+      }
+      start = cursorIndex + 1;
+    }
+
+    const candidates = runs.slice(start, start + options.limit + 1);
+    const hasMore = candidates.length > options.limit;
+    const page = hasMore ? candidates.slice(0, options.limit) : candidates;
+    const last = page[page.length - 1];
+
+    return {
+      runs: page,
+      totalCount,
+      nextCursor: hasMore && last ? last.id : null,
+    };
   }
 
   async createSourceSnapshot(input: CreateSourceSnapshotInput): Promise<SourceSnapshotRecord> {
@@ -343,7 +397,21 @@ export class MemoryRepository implements Repository {
   async listSourceSnapshotsByProject(projectId: string): Promise<SourceSnapshotWithCount[]> {
     return [...this.sourceSnapshots.values()]
       .filter((snapshot) => snapshot.projectId === projectId)
-      .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+      .sort(compareSourceSnapshotsDesc)
+      .map((snapshot) => ({
+        ...clone(snapshot),
+        impactCount: [...this.sourceImpacts.values()].filter(
+          (impact) => impact.snapshotId === snapshot.id,
+        ).length,
+      }));
+  }
+
+  async listSourceSnapshotsByAnalysisRun(
+    analysisRunId: string,
+  ): Promise<SourceSnapshotWithCount[]> {
+    return [...this.sourceSnapshots.values()]
+      .filter((snapshot) => snapshot.analysisRunId === analysisRunId)
+      .sort(compareSourceSnapshotsDesc)
       .map((snapshot) => ({
         ...clone(snapshot),
         impactCount: [...this.sourceImpacts.values()].filter(

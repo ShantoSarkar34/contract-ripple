@@ -1,13 +1,17 @@
 # ContractRipple — Architecture
 
-## Current state (Phase 4)
+## Current state (Phase 6)
 
 The repository contains one Next.js application at the repository root, an
 Express API with persistence, a shared types/schemas package, a standalone
-OpenAPI comparison engine, and a source-analysis package. The `/contracts`
-route is wired to the real API and database; source analysis (ZIP and GitHub)
-is available for a comparison. The marketing page (`/`) still renders clearly
-labeled demo content.
+OpenAPI comparison engine, a source-analysis package, and a standalone impact
+graph builder. The `/contracts` route is wired to the real API and database;
+source analysis (ZIP and GitHub) is available for a comparison, and the
+source-impact panel renders an evidence-backed operation→file map with a
+filterable findings table and an accessible relationships view. Saved history
+is cursor-paginated, comparisons can be downloaded as JSON or Markdown, and
+operation-scoped regression suggestions are derived from persisted findings.
+The marketing page (`/`) still renders clearly labeled demo content.
 
 ```
 contract-ripple/            # git repo root
@@ -16,24 +20,27 @@ contract-ripple/            # git repo root
 ├── src/components/         # presentation components (demo + contracts workspace)
 ├── src/lib/                # frontend API client and view helpers
 ├── apps/api/               # Express API (routes, services, repositories)
+│   ├── src/services/       # comparison, source, report, and regression-tests logic
 │   └── prisma/             # Prisma schema + migrations
 ├── packages/shared/        # shared types/schemas (zod request schemas)
 ├── packages/engine/        # OpenAPI parse/validate/normalize/compare/classify
 ├── packages/source-analysis/ # TypeScript AST call detection + path matching
-├── docs/                   # plans, architecture, design review, engine/API/source docs
+├── packages/impact-graph/  # deterministic findings + impacts → operation/file graph
+├── docs/                   # plans, architecture, design review, engine/API/source/graph/report docs
 ├── .env.example            # frontend placeholders
 └── apps/api/.env.example   # backend placeholders
 ```
 
 Tests live beside the source in `packages/shared`, `packages/engine`,
-`packages/source-analysis`, and `apps/api` and run through Vitest. One database
-integration test is skipped unless `RUN_DB_TESTS=1` is set.
+`packages/source-analysis`, `packages/impact-graph`, and `apps/api` and run
+through Vitest. One database integration test is skipped unless
+`RUN_DB_TESTS=1` is set.
 
 ## Monorepo strategy
 
 **Incremental, not destructive.** The frontend remains at the root so the existing Vercel
 deployment (`contractripple.vercel.app`) is unaffected. npm workspaces attach `apps/api`,
-`packages/shared`, `packages/engine`, and `packages/source-analysis`.
+`packages/shared`, `packages/engine`, `packages/source-analysis`, and `packages/impact-graph`.
 
 Future target (requires separate approval and a Vercel root-directory change):
 
@@ -43,6 +50,7 @@ apps/api/        # Express backend
 packages/shared/ # shared schemas/types
 packages/engine/ # OpenAPI comparison engine
 packages/source-analysis/ # source AST analysis
+packages/impact-graph/    # graph construction
 docs/
 prompts/
 ```
@@ -98,7 +106,33 @@ parse (JSON/YAML) → validate → canonicalize → normalize → compare → cl
 - See `docs/source-analysis.md` for supported patterns, matching rules, and
   security limits.
 
-## Data flow (implemented in Phase 4)
+### Impact graph (`packages/impact-graph/`)
+- Dependency-free, deterministic builder that groups comparison findings into
+  changed operations and connects them to persisted source impacts by normalized
+  method + path.
+- Emits operation nodes, file nodes, and evidence-bearing relationships; never
+  invents a relationship that is not present in the inputs.
+- Applies risk/category/method/confidence/query filters and explicit operation,
+  file, relationship, and evidence limits. Unmapped findings and unmatched
+  impacts become limitations rather than being silently dropped or reattached.
+- Built in the browser from existing DTOs; there is no graph-specific API or
+  database table.
+- See `docs/impact-graph.md` for the model, construction rules, limits, library
+  evaluation, and UI/accessibility behavior.
+
+### Reports and regression suggestions (`apps/api/src/services/`)
+- `regression-tests.ts` is a pure, deterministic function over persisted
+  findings. It groups findings by normalized method + path, keeps the highest
+  risk, derives review checks from categories/change types, and ignores
+  findings that are not operation-scoped.
+- `reports.ts` projects a stored `AnalysisRunDetailDto` plus the latest
+  attached source snapshot into the shared `AnalysisReportDto`. It renders the
+  same report as Markdown. It does not inspect or mutate source content beyond
+  the persisted evidence.
+- Reports are generated on request. There is no report table, file archive, or
+  background worker. Unknown comparisons return the normal `404` envelope.
+
+## Data flow (implemented in Phase 6)
 
 ```
 Contract upload (JSON/YAML text, ≤ 5 MiB)
@@ -109,15 +143,18 @@ Engine parse + validate + normalize ──► ContractVersion (PostgreSQL, raw t
         ▼
 Compare stored baseline ↔ candidate ──► AnalysisRun + Finding rows (classified)
         │
-        ├──► /contracts workspace reads and displays real findings with JSON Pointers
+        ├──► /contracts workspace: filterable findings table + JSON Pointer evidence
         │
         ├──► Source analysis (ZIP / GitHub) ──► SourceSnapshot + SourceFile + SourceImpact
         │                                      (evidence: file, line, snippet, confidence)
-        ├──► Impact graph (nodes/edges from real findings + references)       (Phase 5)
-        └──► Reports (JSON / readable) + regression suggestions               (Phase 6)
+        ├──► Impact graph (client-side: changed operations ↔ persisted source matches,
+        │                  map + accessible relationships table, evidence details)
+        ├──► Saved history (cursor-paginated comparison list, newest first)
+        ├──► Regression suggestions (operation-scoped review prompts from findings)
+        └──► Report exports (JSON + Markdown; latest attached source snapshot)
 ```
 
-## API surface (implemented in Phase 4)
+## API surface (implemented in Phase 6)
 
 Under `/api/v1`:
 
@@ -130,12 +167,17 @@ Under `/api/v1`:
 - Versions: `POST /contracts/:contractId/versions` (validates before saving),
   `GET /contracts/:contractId/versions`, `GET /versions/:versionId`.
 - Comparisons: `POST /projects/:projectId/comparisons`,
-  `GET /projects/:projectId/comparisons`, `GET /comparisons/:comparisonId`.
+  `GET /projects/:projectId/comparisons` (cursor pagination),
+  `GET /comparisons/:comparisonId`.
 - Source analysis: `POST /projects/:projectId/source/zip` (multipart),
   `POST /projects/:projectId/source/github`,
   `GET /projects/:projectId/source`, `GET /source/:snapshotId`,
   `GET /github/status`.
-- Reports/exports (Phase 6).
+- Reports: `GET /comparisons/:comparisonId/report?format=json|markdown`
+  (download attachment; latest attached source snapshot included).
+
+The impact graph is a client-side projection of the comparison and source DTOs;
+it adds no endpoints or database tables.
 
 See `docs/api.md` for request/response shapes and error codes. All mutating
 endpoints will require authentication and ownership checks in Phase 7.
@@ -151,11 +193,13 @@ endpoints will require authentication and ownership checks in Phase 7.
 - No secrets in logs, client responses, or repository files.
 - CORS uses an explicit origin allowlist from environment configuration.
 
-## Persistence (implemented in Phase 4)
+## Persistence (implemented in Phase 6)
 
 Prisma + PostgreSQL. Models: `Project`, `Contract`, `ContractVersion`,
 `AnalysisRun`, `Finding`, `SourceSnapshot`, `SourceFile`, and `SourceImpact`,
-with `AnalysisStatus` as a Postgres enum. Cascading deletes remove contracts,
+with `AnalysisStatus` as a Postgres enum. Phases 5 and 6 add no schema changes;
+the impact graph, pagination, reports, and regression suggestions are derived
+from these records. Cascading deletes remove contracts,
 versions, runs, findings, and source snapshots with their parent project (source
 snapshots keep their comparison via `onDelete: SetNull`). `ContractVersion`
 stores untrusted spec text plus a SHA-256 checksum; `Finding` and `SourceImpact`
@@ -179,4 +223,9 @@ are applied with `prisma migrate deploy`.
 - Full monorepo move of the frontend to `apps/web` (separate approved migration).
 - OpenAPI parser/diff library choice — resolved in Phase 2 and documented in
   `docs/engine.md`.
-- Graph library choice (evaluated and documented in Phase 5).
+- Graph library choice — resolved in Phase 5: a dependency-free, deterministic
+  SVG layout with an accessible table fallback was chosen over React Flow,
+  d3-force, and Cytoscape. See `docs/impact-graph.md`.
+- Report format and storage — resolved in Phase 6: generate JSON and Markdown on
+  request from persisted records, include the latest source snapshot, and store
+  no report artifacts. See `docs/reports.md`.

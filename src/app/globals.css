@@ -6,12 +6,16 @@
   :root {
     --background: #ffffff;
     --foreground: #0f172a;
+    --background-rgb: 255 255 255;
+    --foreground-rgb: 15 23 42;
   }
 
   @media (prefers-color-scheme: dark) {
     :root {
       --background: #020617;
       --foreground: #f8fafc;
+      --background-rgb: 2 6 23;
+      --foreground-rgb: 248 250 252;
     }
   }
 
@@ -22,8 +26,34 @@
   body {
     background: var(--background);
     color: var(--foreground);
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
     line-height: 1.5;
+  }
+
+  code,
+  pre,
+  kbd,
+  samp {
+    font-family: var(--font-geist-mono), monospace;
+  }
+
+  :where(a, button, summary):focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
