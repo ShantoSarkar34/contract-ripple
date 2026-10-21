@@ -7,6 +7,7 @@ const FOOTER_LINKS: { heading: string; links: FooterLink[] }[] = [
   {
     heading: "Product",
     links: [
+      { href: "/dashboard", label: "Dashboard" },
       { href: "/contracts", label: "Contract workspace" },
       { href: "/#impact-demo", label: "Demo impact report" },
       { href: "/login", label: "Sign in" },

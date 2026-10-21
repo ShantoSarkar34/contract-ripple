@@ -34,7 +34,7 @@ export default function LoginForm() {
 
   useEffect(() => {
     if (status === "authenticated") {
-      router.replace("/contracts");
+      router.replace("/dashboard");
     }
   }, [status, router]);
 
@@ -64,7 +64,7 @@ export default function LoginForm() {
       } else {
         await signIn(trimmedEmail, password);
       }
-      router.replace("/contracts");
+      router.replace("/dashboard");
     } catch (submitError) {
       setError(errorMessage(submitError));
       if (submitError instanceof ApiRequestError) {
@@ -81,7 +81,7 @@ export default function LoginForm() {
         <p className="text-sm leading-6 text-muted">
           Signed in as <span className="font-medium text-foreground">{user.email}</span>.
         </p>
-        <Link href="/contracts" className="btn-primary mt-4 inline-flex">
+        <Link href="/dashboard" className="btn-primary mt-4 inline-flex">
           Open workspace
         </Link>
       </div>

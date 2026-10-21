@@ -59,6 +59,27 @@ scheme.
   (`px-4 py-8 md:px-6 lg:px-8`). Sticky sub-bars inside the workspace use `top-16`.
 - Never allow page-level horizontal scrolling. Wide tables get an `overflow-x-auto` wrapper with a
   minimum width; mobile card lists replace them in later stages.
+- Dashboard: stats use a 2-up grid below `lg` and 4-up above; the project grid is 2-up from `sm`. The
+  risk/count side rail moves below the projects until `xl`, where it becomes a 19rem column. This
+  avoids squeezing project cards when the 256 px sidebar and side rail are both present.
+
+## Workspace navigation
+
+The workspace shell exposes only routes that exist: Dashboard (`/dashboard`) and Contracts
+(`/contracts`). Add an entry to `NAV_ITEMS` in `workspace-shell.tsx` in the same change that adds the
+route, so the sidebar never shows a dead link. The top-bar breadcrumb derives from the active item.
+Inside the workspace the logo returns to `/dashboard`; "Back to site" returns to the marketing site.
+Sign-in and "Open workspace" links land on the dashboard.
+
+## Dashboard data
+
+`/dashboard` reuses owner-scoped endpoints instead of an aggregate API. It fetches the project list
+once, then the latest saved analysis for each project, capped at 25 projects
+(`DASHBOARD_PROJECT_LIMIT`). Project and contract counts are exact; saved-analysis totals cover the
+inspected projects and are labeled as partial when the cap or a request failure applies. No count is
+estimated or invented. If an aggregate `GET /api/v1/dashboard` is approved later, replace
+`src/lib/dashboard.ts` without changing the view.
+
 
 ## Components
 

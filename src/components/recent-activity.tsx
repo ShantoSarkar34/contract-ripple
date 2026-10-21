@@ -38,7 +38,7 @@ export default function RecentActivity() {
               Example activity from a sample team workspace.
             </p>
           </div>
-          <Link href="/contracts" className="btn-ghost">
+          <Link href="/dashboard" className="btn-ghost">
             Open workspace
             <span aria-hidden="true">→</span>
           </Link>

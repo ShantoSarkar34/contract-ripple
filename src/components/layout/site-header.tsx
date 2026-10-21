@@ -10,7 +10,7 @@ import { Logo } from "./logo";
 const LINKS = [
   { href: "/", label: "Overview" },
   { href: "/#impact-demo", label: "Demo report" },
-  { href: "/contracts", label: "Workspace" },
+  { href: "/dashboard", label: "Workspace" },
 ];
 
 function isActive(pathname: string, href: string): boolean {
@@ -99,7 +99,7 @@ export default function SiteHeader() {
             </Link>
           )}
 
-          <Link href="/contracts" className="btn-primary hidden sm:inline-flex">
+          <Link href="/dashboard" className="btn-primary hidden sm:inline-flex">
             Open workspace
           </Link>
 
@@ -180,7 +180,7 @@ export default function SiteHeader() {
             )}
 
             <Link
-              href="/contracts"
+              href="/dashboard"
               className="btn-primary mt-2 w-full"
               onClick={() => setMenuOpen(false)}
             >

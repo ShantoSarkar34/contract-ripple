@@ -8,6 +8,26 @@ import { Logo } from "@/components/layout/logo";
 import { Dialog } from "@/components/ui/dialog";
 import { cn } from "@/lib/cn";
 
+function DashboardIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-4 w-4 shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="3" y="3" width="7" height="9" rx="1.5" />
+      <rect x="14" y="3" width="7" height="5" rx="1.5" />
+      <rect x="14" y="12" width="7" height="9" rx="1.5" />
+      <rect x="3" y="16" width="7" height="5" rx="1.5" />
+    </svg>
+  );
+}
+
 function ContractsIcon() {
   return (
     <svg
@@ -28,6 +48,12 @@ function ContractsIcon() {
 }
 
 const NAV_ITEMS = [
+  {
+    href: "/dashboard",
+    label: "Dashboard",
+    description: "Projects, contracts, and recent analyses",
+    icon: <DashboardIcon />,
+  },
   {
     href: "/contracts",
     label: "Contracts",
@@ -84,7 +110,7 @@ function SidebarBody({
 
       <nav aria-label="Workspace" className="mt-5 flex-1 px-3">
         <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-sidebar-muted">
-          Analyze
+          Workspace
         </p>
         <ul className="mt-2 space-y-1">
           {NAV_ITEMS.map((item) => {
@@ -199,7 +225,7 @@ export default function WorkspaceShell({ children }: { children: React.ReactNode
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-sidebar-line bg-sidebar-ink lg:block">
         <div className="flex h-full flex-col">
           <div className="flex h-16 items-center border-b border-sidebar-line px-5">
-            <Logo inverted />
+            <Logo inverted href="/dashboard" />
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto py-4">
             <SidebarBody pathname={pathname} />

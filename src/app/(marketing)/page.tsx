@@ -25,7 +25,7 @@ export default function Home() {
             <Link href="/login" className="btn-primary w-full sm:w-auto">
               Create your workspace
             </Link>
-            <Link href="/contracts" className="btn-secondary w-full sm:w-auto">
+            <Link href="/dashboard" className="btn-secondary w-full sm:w-auto">
               Open workspace
             </Link>
           </div>
