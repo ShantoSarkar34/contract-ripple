@@ -1,7 +1,6 @@
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import express, { type Express } from "express";
-import helmet from "helmet";
 import type { Repository } from "./db/types.js";
 import type { NodeEnvironment } from "./config/env.js";
 import {
@@ -10,6 +9,7 @@ import {
   type CookieSameSite,
 } from "./middleware/auth.js";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler.js";
+import { securityHeaders } from "./middleware/security-headers.js";
 import { createAuthRouter } from "./routes/auth.js";
 import { createComparisonsRouter } from "./routes/comparisons.js";
 import { createContractsRouter } from "./routes/contracts.js";
@@ -75,7 +75,7 @@ export function createApp({
   app.disable("x-powered-by");
   app.set("trust proxy", trustProxy);
   app.use(
-    helmet({
+    securityHeaders({
       // This service returns JSON and downloads, never HTML documents.
       contentSecurityPolicy: false,
       crossOriginEmbedderPolicy: false,
