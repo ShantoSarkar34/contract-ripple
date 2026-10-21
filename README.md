@@ -5,15 +5,16 @@ potential impact on frontend integrations. It compares OpenAPI specifications, c
 potentially breaking changes, analyzes frontend source code for affected calls, and visualizes
 the evidence-backed relationships.
 
-> **Status:** Phase 6. The OpenAPI engine is wired to an Express API with
+> **Status:** Phase 7. The OpenAPI engine is wired to an Express API with
 > PostgreSQL persistence, and the `/contracts` workspace runs real comparisons,
 > shows classified findings in a filterable table with JSON Pointer evidence,
 > analyzes ZIP/GitHub source for affected integrations with file/line evidence,
 > renders an evidence-backed operation→file impact graph with an accessible
 > relationships view, paginates saved history, downloads JSON/Markdown reports,
-> and derives regression review prompts from persisted findings. The landing
-> page (`/`) still renders clearly labeled demo content. Authentication and
-> ownership checks are not implemented yet.
+> and derives regression review prompts from persisted findings. Phase 7 adds
+> email/password authentication with database-backed sessions, CSRF protection,
+> server-side project ownership checks, security headers, and database-backed
+> rate limits. The landing page (`/`) still renders clearly labeled demo content.
 
 ## Stack
 
@@ -43,7 +44,7 @@ contract-ripple/            # git repo root (frontend + workspaces)
 │   ├── source-analysis/    # TypeScript AST call detection + operation matching
 │   ├── impact-graph/       # deterministic operation→source graph builder
 │   └── shared/             # shared types and zod request schemas
-├── docs/                   # plan, architecture, design review, engine/API/source/graph/report docs
+├── docs/                   # plan, architecture, design review, engine/API/source/graph/report/release docs
 ├── AGENTS.md               # permanent project instructions
 └── .env.example
 ```
@@ -69,17 +70,36 @@ cp .env.example .env.local        # Windows: copy .env.example .env.local
 
 # backend environment
 cp apps/api/.env.example apps/api/.env   # Windows: copy apps/api/.env.example apps/api/.env
-# then set DATABASE_URL in apps/api/.env
+# then set DATABASE_URL and AUTH_SECRET in apps/api/.env
+# generate a secret with:
+#   node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 
 # generate the Prisma client and apply migrations
 npm run db:generate
 npm run db:deploy
 ```
 
+## Authentication
+
+Accounts are email/password only. Passwords are hashed with `scrypt` and never
+stored or returned. A successful register/login creates an opaque session token
+that is stored in an `HttpOnly` cookie (`cr_session`); only its SHA-256 hash is
+persisted. Unsafe requests must also send the session-derived CSRF token in
+`x-csrf-token`, which the frontend keeps in memory.
+
+Every project and nested resource is checked against the signed-in user on the
+server. Another user's ids return `404`, not `403`. The first account you create
+via `/login` is a normal account; there is no admin role.
+
+For local development, `AUTH_SECRET` may be omitted (a development-only fallback
+is used), but production startup fails without a real secret of at least 32
+characters. See `docs/api.md` for auth endpoints and `docs/release-checklist.md`
+before deploying.
+
 ## Run
 
 ```bash
-# Frontend → http://localhost:3000  (workspace at /contracts)
+# Frontend → http://localhost:3000  (sign in at /login, workspace at /contracts)
 npm run dev
 
 # API → http://localhost:4000/api/v1/health
@@ -200,7 +220,8 @@ Frontend (`.env.local`, see `.env.example`):
 
 | Variable | Description |
 | --- | --- |
-| `NEXT_PUBLIC_API_BASE_URL` | API base URL including `/api/v1` |
+| `NEXT_PUBLIC_API_BASE_URL` | API base URL including `/api/v1`, or `/api/v1` when using the proxy |
+| `API_PROXY_TARGET` | Optional API origin (no `/api/v1`) for the same-origin rewrite |
 
 Backend (`apps/api/.env`, see `apps/api/.env.example`):
 
@@ -208,15 +229,20 @@ Backend (`apps/api/.env`, see `apps/api/.env.example`):
 | --- | --- |
 | `NODE_ENV` | `development`, `test`, or `production` |
 | `PORT` | API port (default `4000`) |
-| `CORS_ORIGINS` | Comma-separated allowed browser origins |
+| `CORS_ORIGINS` | Comma-separated allowed browser origins (also used by the CSRF origin guard) |
 | `DATABASE_URL` | PostgreSQL connection string (Phase 3+) |
+| `AUTH_SECRET` | Session/CSRF secret; required in production, at least 32 characters |
+| `AUTH_COOKIE_SECURE` | Session cookie `Secure` flag; defaults to true in production |
+| `AUTH_COOKIE_SAME_SITE` | `lax` (default), `strict`, or `none` (requires secure cookies) |
+| `TRUST_PROXY` | Trust forwarded client-IP headers; defaults to true in production |
 | `GITHUB_TOKEN` | Optional server-side GitHub App/PAT token with read-only Contents access |
 | `GITHUB_API_BASE_URL` | GitHub REST base URL (default `https://api.github.com`) |
 
 Never commit real `.env` files. `.gitignore` ignores them but allows `.env.example`.
-`GITHUB_TOKEN` is never returned by the API, written to logs, or included in
-error responses. Leave it empty to disable GitHub analysis; the API then reports
-`github_not_configured` instead of faking a connection.
+`AUTH_SECRET`, `DATABASE_URL`, and `GITHUB_TOKEN` are never returned by the API,
+written to logs, or included in error responses. Leave `GITHUB_TOKEN` empty to
+disable GitHub analysis; the API then reports `github_not_configured` instead of
+faking a connection.
 
 ## API (current)
 
@@ -225,6 +251,7 @@ Base URL `/api/v1`. All responses are JSON; errors use a consistent
 
 - `GET /health` — liveness.
 - `GET /ready` — readiness including database connectivity (`200`/`503`).
+- `POST /auth/register`, `POST /auth/login`, `GET /auth/me`, `POST /auth/logout`
 - `POST /projects`, `GET /projects`, `GET /projects/:projectId`,
   `PATCH /projects/:projectId`
 - `POST /projects/:projectId/contracts`, `GET /projects/:projectId/contracts`,
@@ -240,8 +267,9 @@ Base URL `/api/v1`. All responses are JSON; errors use a consistent
 
 See `docs/api.md` for request/response fields, error codes, and limits.
 
-> **No authentication yet.** The API is unauthenticated by design until Phase 7.
-> Do not expose it publicly with real user data before then.
+> **Authentication is required.** Except for `/health`, `/ready`, and `/auth/*`,
+> every route needs a session cookie and, for unsafe methods, `x-csrf-token`.
+> Data routes are scoped to the authenticated user's projects.
 
 ## Testing
 
@@ -251,8 +279,8 @@ Unit and route tests use Vitest and live next to the code they cover:
 - `packages/engine/src/*.test.ts` — parsing, validation, comparison, classification, security.
 - `packages/source-analysis/src/*.test.ts` — AST call detection, path matching, template paths, limits.
 - `packages/impact-graph/src/*.test.ts` — graph grouping, matching, filters, limits, evidence, and deterministic ordering.
-- `apps/api/src/services/*.test.ts` — project/contract/comparison/source/report services with an in-memory repository; regression-suggestion grouping, evidence bounds, and stable ordering.
-- `apps/api/src/routes/app.test.ts`, `apps/api/src/routes/source.test.ts`, `apps/api/src/routes/reports.test.ts` — real HTTP requests against an ephemeral server, including pagination and JSON/Markdown downloads.
+- `apps/api/src/services/*.test.ts` — project/contract/comparison/source/report services with an in-memory repository; auth, password hashing, session expiry, and rate limiting; regression-suggestion grouping, evidence bounds, and stable ordering.
+- `apps/api/src/routes/app.test.ts`, `apps/api/src/routes/auth.test.ts`, `apps/api/src/routes/authorization.test.ts`, `apps/api/src/routes/source.test.ts`, `apps/api/src/routes/reports.test.ts` — real HTTP requests against an ephemeral server, including auth cookies/CSRF, cross-user IDOR checks, security headers, pagination, and JSON/Markdown downloads.
 
 ```bash
 npm test
@@ -263,10 +291,12 @@ references, circular references, external references, deterministic ordering,
 JSON Pointer escaping, input limits, and security cases. The graph tests cover
 grouping, normalized matching, unmatched evidence, filters, limits, deterministic
 ordering, and the no-missing-endpoints guarantee. The API tests cover input
-validation, engine error mapping, persistence DTOs, cross-project checks, ZIP
-traversal and size limits, GitHub error mapping, saved-history pagination,
-report downloads, regression-suggestion generation, and the full project →
-contract → version → comparison → source-analysis flow.
+validation, engine error mapping, persistence DTOs, authentication and CSRF,
+session expiry, rate limiting, security headers, cross-user IDOR checks for every
+resource family, ZIP traversal and size limits, GitHub error mapping,
+saved-history pagination, report downloads, regression-suggestion generation,
+and the full authenticated project → contract → version → comparison →
+source-analysis flow.
 
 One PostgreSQL integration test is skipped by default. Run it against a
 configured `apps/api/.env` database with:
@@ -279,8 +309,8 @@ set RUN_DB_TESTS=1&& npx vitest run apps/api/src/db
 RUN_DB_TESTS=1 npx vitest run apps/api/src/db
 ```
 
-It creates a project, uploads two versions, runs a comparison, analyzes a ZIP
-source archive, reads the snapshot back, and deletes the project at the end.
+It creates a user, project, two versions, a comparison, and a ZIP source
+snapshot, reads them back, then deletes the project and user.
 
 ## Deployment
 
@@ -290,9 +320,12 @@ source archive, reads the snapshot back, and deletes the project at the end.
   (current live API: `contractripple-api.vercel.app/api/v1`).
 - **Database:** managed PostgreSQL; migrations are run deliberately with
   `npm run db:deploy`, never automatically on server start.
-- Set `NEXT_PUBLIC_API_BASE_URL` on the frontend, and `DATABASE_URL`,
-  `CORS_ORIGINS`, and the optional `GITHUB_TOKEN` on the API. Use HTTPS and
-  exact CORS origins.
+- Set `NEXT_PUBLIC_API_BASE_URL` on the frontend (plus optional
+  `API_PROXY_TARGET`), and `DATABASE_URL`, `CORS_ORIGINS`, `AUTH_SECRET`, and
+  the optional `GITHUB_TOKEN` on the API. Use HTTPS and exact CORS origins.
+- Apply the Phase 7 migration before switching traffic. Review
+  `docs/release-checklist.md` first; pre-Phase-7 projects have no owner and are
+  inaccessible until assigned.
 - Vercel Functions limit request bodies to 4.5 MB, below the application's
   10 MiB ZIP limit. See `docs/deployment.md` for the full deployment topology,
   CLI commands, limits, and security status.
@@ -308,6 +341,7 @@ source archive, reads the snapshot back, and deletes the project at the end.
 - `docs/impact-graph.md` — graph model, construction rules, limits, accessibility, and library evaluation.
 - `docs/reports.md` — report exports, regression suggestions, latest-snapshot policy, and limits.
 - `docs/deployment.md` — Vercel frontend/API topology, environment variables, limits, and security status.
+- `docs/release-checklist.md` — pre-merge, migration, deploy, verification, and rollback checklist.
 - `docs/design-review.md` — UI review and improvement priorities.
 
 ## Demo data

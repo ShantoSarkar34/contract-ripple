@@ -29,6 +29,7 @@ export type GetReportOptions = {
 
 export async function getComparisonReport(
   repository: Repository,
+  ownerId: string,
   comparisonId: string,
   options: GetReportOptions = {},
 ): Promise<AnalysisReportDto> {
@@ -38,8 +39,8 @@ export async function getComparisonReport(
   }
 
   const project = await repository.getProject(run.projectId);
-  if (!project) {
-    throw notFound("project_not_found", "Project not found.");
+  if (!project || project.ownerId !== ownerId) {
+    throw notFound("comparison_not_found", "Comparison not found.");
   }
 
   const detail = toAnalysisRunDetailDto(run);

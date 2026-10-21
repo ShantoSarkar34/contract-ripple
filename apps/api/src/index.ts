@@ -12,6 +12,11 @@ const repository = new PrismaRepository(getPrismaClient());
 const app: express.Express = createApp({
   corsOrigins: env.corsOrigins,
   repository,
+  authSecret: env.authSecret,
+  nodeEnv: env.nodeEnv,
+  cookieSecure: env.cookieSecure,
+  cookieSameSite: env.cookieSameSite,
+  trustProxy: env.trustProxy,
   githubToken: env.githubToken,
   githubApiBaseUrl: env.githubApiBaseUrl,
 });

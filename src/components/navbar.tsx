@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
+import { useAuth } from "@/components/auth-provider";
 
 const NAV_LINKS = [
   { href: "/", label: "Overview" },
@@ -15,7 +16,21 @@ function isActive(pathname: string, href: string): boolean {
 
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { status, user, signOut } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+
+  async function handleSignOut() {
+    setSigningOut(true);
+    try {
+      await signOut();
+      setMenuOpen(false);
+      router.push("/");
+    } finally {
+      setSigningOut(false);
+    }
+  }
 
   return (
     <nav
@@ -55,6 +70,32 @@ export default function Navbar() {
         </div>
 
         <div className="flex items-center gap-2">
+          {status === "checking" ? (
+            <span className="hidden text-xs text-slate-400 sm:inline dark:text-slate-500">
+              Checking session…
+            </span>
+          ) : status === "authenticated" && user ? (
+            <>
+              <span
+                className="hidden max-w-[12rem] truncate text-xs text-slate-500 sm:inline dark:text-slate-400"
+                title={user.email}
+              >
+                {user.email}
+              </span>
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={handleSignOut}
+                disabled={signingOut}
+              >
+                {signingOut ? "Signing out…" : "Sign out"}
+              </button>
+            </>
+          ) : (
+            <Link href="/login" className="btn-ghost">
+              Sign in
+            </Link>
+          )}
           <Link href="/contracts" className="btn-primary hidden sm:inline-flex">
             Open workspace
           </Link>
@@ -111,6 +152,31 @@ export default function Navbar() {
               );
             })}
           </ul>
+
+          {status === "authenticated" && user ? (
+            <div className="mt-3 border-t border-slate-200/70 pt-3 dark:border-slate-800/70">
+              <p className="truncate px-1 text-xs text-slate-500 dark:text-slate-400">
+                Signed in as {user.email}
+              </p>
+              <button
+                type="button"
+                className="btn-ghost mt-2 w-full justify-center"
+                onClick={handleSignOut}
+                disabled={signingOut}
+              >
+                {signingOut ? "Signing out…" : "Sign out"}
+              </button>
+            </div>
+          ) : status === "checking" ? null : (
+            <Link
+              href="/login"
+              className="btn-ghost mt-3 w-full justify-center"
+              onClick={() => setMenuOpen(false)}
+            >
+              Sign in
+            </Link>
+          )}
+
           <Link
             href="/contracts"
             className="btn-primary mt-2 w-full sm:hidden"

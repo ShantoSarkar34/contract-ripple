@@ -6,20 +6,37 @@ import {
 } from "@contract-ripple/shared";
 import type { Repository } from "../db/types.js";
 import { asyncHandler } from "../middleware/async-handler.js";
+import { requireAuth } from "../middleware/auth.js";
 import { parseWithSchema } from "../middleware/validate.js";
 import { createComparison, getComparison, listComparisons } from "../services/comparisons.js";
+import {
+  enforceRateLimit,
+  rateLimitKey,
+  type RateLimitConfig,
+} from "../services/rate-limit.js";
 import { getComparisonReport, renderMarkdownReport } from "../services/reports.js";
 import { requiredParam } from "./params.js";
 
-export function createComparisonsRouter(repository: Repository): Router {
+export function createComparisonsRouter(
+  repository: Repository,
+  rateLimits: RateLimitConfig,
+): Router {
   const router = Router();
 
   router.post(
     "/projects/:projectId/comparisons",
     asyncHandler(async (request, response) => {
+      const auth = requireAuth(request);
+      await enforceRateLimit(
+        repository,
+        rateLimitKey("comparison:create:user", auth.user.id),
+        rateLimits.createComparisonPerUser,
+      );
+
       const input = parseWithSchema(createComparisonRequestSchema, request.body);
       const analysis = await createComparison(
         repository,
+        auth.user.id,
         requiredParam(request, "projectId"),
         input,
       );
@@ -30,9 +47,11 @@ export function createComparisonsRouter(repository: Repository): Router {
   router.get(
     "/projects/:projectId/comparisons",
     asyncHandler(async (request, response) => {
+      const auth = requireAuth(request);
       const query = parseWithSchema(listComparisonsQuerySchema, request.query);
       const body = await listComparisons(
         repository,
+        auth.user.id,
         requiredParam(request, "projectId"),
         query,
       );
@@ -43,9 +62,11 @@ export function createComparisonsRouter(repository: Repository): Router {
   router.get(
     "/comparisons/:comparisonId/report",
     asyncHandler(async (request, response) => {
+      const auth = requireAuth(request);
       const query = parseWithSchema(reportQuerySchema, request.query);
       const report = await getComparisonReport(
         repository,
+        auth.user.id,
         requiredParam(request, "comparisonId"),
       );
       const safeId = report.comparison.id.replace(/[^a-zA-Z0-9_-]/g, "");
@@ -70,7 +91,12 @@ export function createComparisonsRouter(repository: Repository): Router {
   router.get(
     "/comparisons/:comparisonId",
     asyncHandler(async (request, response) => {
-      const analysis = await getComparison(repository, requiredParam(request, "comparisonId"));
+      const auth = requireAuth(request);
+      const analysis = await getComparison(
+        repository,
+        auth.user.id,
+        requiredParam(request, "comparisonId"),
+      );
       response.status(200).json(analysis);
     }),
   );

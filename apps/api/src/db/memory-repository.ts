@@ -4,6 +4,7 @@ import type {
   AnalysisRunRecord,
   AnalysisRunScopeRecord,
   AnalysisRunWithVersions,
+  ConsumeRateLimitInput,
   ContractRecord,
   ContractRecordWithCount,
   ContractVersionRecord,
@@ -12,23 +13,34 @@ import type {
   CreateContractInput,
   CreateContractVersionInput,
   CreateProjectInput,
+  CreateSessionInput,
   CreateSourceSnapshotInput,
+  CreateUserInput,
   FindingRecord,
   ListAnalysisRunsPageOptions,
   ProjectRecord,
   ProjectRecordWithCount,
+  RateLimitResult,
   Repository,
+  SessionRecord,
+  SessionWithUserRecord,
   SourceFileRecord,
   SourceImpactRecord,
   SourceSnapshotDetailRecord,
   SourceSnapshotRecord,
   SourceSnapshotWithCount,
   UpdateProjectInput,
+  UserRecord,
 } from "./types.js";
 
 function clone<T>(value: T): T {
   return structuredClone(value);
 }
+
+type RateLimitBucketRecord = {
+  count: number;
+  resetAt: Date;
+};
 
 function compareAnalysisRunsDesc(
   left: AnalysisRunRecord,
@@ -55,6 +67,9 @@ function compareSourceSnapshotsDesc(
  */
 export class MemoryRepository implements Repository {
   private counter = 0;
+  private readonly users = new Map<string, UserRecord>();
+  private readonly sessions = new Map<string, SessionRecord>();
+  private readonly rateLimits = new Map<string, RateLimitBucketRecord>();
   private readonly projects = new Map<string, ProjectRecord>();
   private readonly contracts = new Map<string, ContractRecord>();
   private readonly versions = new Map<string, ContractVersionRecord>();
@@ -73,10 +88,89 @@ export class MemoryRepository implements Repository {
     return Promise.resolve();
   }
 
+  async createUser(input: CreateUserInput): Promise<UserRecord> {
+    const now = new Date();
+    const record: UserRecord = {
+      id: this.nextId("user"),
+      email: input.email,
+      passwordHash: input.passwordHash,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.users.set(record.id, record);
+    return clone(record);
+  }
+
+  async getUserByEmail(email: string): Promise<UserRecord | null> {
+    const user = [...this.users.values()].find((entry) => entry.email === email);
+    return user ? clone(user) : null;
+  }
+
+  async getUserById(id: string): Promise<UserRecord | null> {
+    const user = this.users.get(id);
+    return user ? clone(user) : null;
+  }
+
+  async createSession(input: CreateSessionInput): Promise<SessionRecord> {
+    const record: SessionRecord = {
+      id: this.nextId("session"),
+      userId: input.userId,
+      tokenHash: input.tokenHash,
+      expiresAt: input.expiresAt,
+      createdAt: new Date(),
+    };
+    this.sessions.set(record.id, record);
+    return clone(record);
+  }
+
+  async getSessionByTokenHash(tokenHash: string): Promise<SessionWithUserRecord | null> {
+    const session = [...this.sessions.values()].find(
+      (entry) => entry.tokenHash === tokenHash,
+    );
+    if (!session) {
+      return null;
+    }
+    const user = this.users.get(session.userId);
+    if (!user) {
+      return null;
+    }
+    return { ...clone(session), user: clone(user) };
+  }
+
+  async deleteSessionByTokenHash(tokenHash: string): Promise<void> {
+    for (const [id, session] of this.sessions) {
+      if (session.tokenHash === tokenHash) {
+        this.sessions.delete(id);
+      }
+    }
+  }
+
+  async consumeRateLimit(input: ConsumeRateLimitInput): Promise<RateLimitResult> {
+    const now = input.now ?? new Date();
+    const current = this.rateLimits.get(input.key);
+    const resetAt = new Date(now.getTime() + input.windowMs);
+    const bucket =
+      !current || current.resetAt.getTime() <= now.getTime()
+        ? { count: 1, resetAt }
+        : { count: current.count + 1, resetAt: current.resetAt };
+    this.rateLimits.set(input.key, bucket);
+
+    return {
+      allowed: bucket.count <= input.limit,
+      remaining: Math.max(0, input.limit - bucket.count),
+      retryAfterSeconds: Math.max(
+        1,
+        Math.ceil((bucket.resetAt.getTime() - now.getTime()) / 1000),
+      ),
+      resetAt: new Date(bucket.resetAt),
+    };
+  }
+
   async createProject(input: CreateProjectInput): Promise<ProjectRecord> {
     const now = new Date();
     const record: ProjectRecord = {
       id: this.nextId("proj"),
+      ownerId: input.ownerId,
       name: input.name,
       description: input.description ?? null,
       createdAt: now,
@@ -86,13 +180,15 @@ export class MemoryRepository implements Repository {
     return clone(record);
   }
 
-  async listProjects(): Promise<ProjectRecordWithCount[]> {
-    return [...this.projects.values()].map((project) => ({
-      ...clone(project),
-      contractCount: [...this.contracts.values()].filter(
-        (contract) => contract.projectId === project.id,
-      ).length,
-    }));
+  async listProjects(ownerId: string): Promise<ProjectRecordWithCount[]> {
+    return [...this.projects.values()]
+      .filter((project) => project.ownerId === ownerId)
+      .map((project) => ({
+        ...clone(project),
+        contractCount: [...this.contracts.values()].filter(
+          (contract) => contract.projectId === project.id,
+        ).length,
+      }));
   }
 
   async getProject(id: string): Promise<ProjectRecordWithCount | null> {

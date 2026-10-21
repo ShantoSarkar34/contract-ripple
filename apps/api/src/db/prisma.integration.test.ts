@@ -28,6 +28,7 @@ const shouldRun =
 describe.skipIf(!shouldRun)("PrismaRepository (integration)", () => {
   let prisma: PrismaClient;
   let repository: PrismaRepository;
+  let userId: string | undefined;
   let projectId: string | undefined;
 
   beforeAll(async () => {
@@ -35,36 +36,49 @@ describe.skipIf(!shouldRun)("PrismaRepository (integration)", () => {
     prisma = new PrismaClientConstructor();
     await prisma.$connect();
     repository = new PrismaRepository(prisma);
+
+    const user = await repository.createUser({
+      email: `integration-${Date.now()}@example.test`,
+      passwordHash: "scrypt$32768$8$1$placeholder$placeholder",
+    });
+    userId = user.id;
   });
 
   afterAll(async () => {
     if (projectId) {
       await prisma.project.delete({ where: { id: projectId } }).catch(() => undefined);
     }
+    if (userId) {
+      await prisma.user.delete({ where: { id: userId } }).catch(() => undefined);
+    }
     await prisma.$disconnect();
   });
 
   it("persists and reads back a full comparison against PostgreSQL", async () => {
     await repository.ping();
+    const ownerId = userId;
+    if (!ownerId) {
+      throw new Error("Integration user was not created.");
+    }
 
-    const project = await createProject(repository, {
+    const project = await createProject(repository, ownerId, {
       name: `integration-${Date.now()}`,
-      description: "Created by the phase 3 integration test",
+      description: "Created by the phase 7 integration test",
     });
     projectId = project.id;
 
-    const contract = await createContract(repository, project.id, { name: "pets-api" });
+    const contract = await createContract(repository, ownerId, project.id, { name: "pets-api" });
 
-    const baseline = await createContractVersion(repository, contract.id, {
+    const baseline = await createContractVersion(repository, ownerId, contract.id, {
       content: baselinePetJson,
       label: "v1",
     });
-    const candidate = await createContractVersion(repository, contract.id, {
+    const candidate = await createContractVersion(repository, ownerId, contract.id, {
       content: candidatePetJson,
       label: "v2",
     });
 
-    const created = await createComparison(repository, project.id, {
+    const created = await createComparison(repository, ownerId, project.id, {
       baselineVersionId: baseline.id,
       candidateVersionId: candidate.id,
       label: "v1 → v2",
@@ -74,17 +88,17 @@ describe.skipIf(!shouldRun)("PrismaRepository (integration)", () => {
     expect(created.findings.length).toBeGreaterThan(0);
     expect(created.baseline.contractName).toBe("pets-api");
 
-    const stored = await getComparison(repository, created.id);
+    const stored = await getComparison(repository, ownerId, created.id);
     expect(stored.id).toBe(created.id);
     expect(stored.findings.map((finding) => finding.id)).toEqual(
       created.findings.map((finding) => finding.id),
     );
     expect(stored.limitations.length).toBeGreaterThan(0);
 
-    const runs = await listComparisons(repository, project.id);
+    const runs = await listComparisons(repository, ownerId, project.id);
     expect(runs.analyses.map((run) => run.id)).toContain(created.id);
 
-    const projects = await repository.listProjects();
+    const projects = await repository.listProjects(ownerId);
     const storedProject = projects.find((entry) => entry.id === project.id);
     expect(storedProject?.contractCount).toBe(1);
 
@@ -94,18 +108,18 @@ describe.skipIf(!shouldRun)("PrismaRepository (integration)", () => {
         axios.get("/pets");
       `),
     });
-    const snapshot = await analyzeZipSource(repository, project.id, archive, {
+    const snapshot = await analyzeZipSource(repository, ownerId, project.id, archive, {
       analysisRunId: created.id,
     });
     expect(snapshot.impactCount).toBe(2);
     expect(snapshot.files).toHaveLength(1);
 
-    const storedSnapshot = await getSourceSnapshot(repository, snapshot.id);
+    const storedSnapshot = await getSourceSnapshot(repository, ownerId, snapshot.id);
     expect(storedSnapshot.impacts.map((impact) => impact.evidence)).toEqual(
       snapshot.impacts.map((impact) => impact.evidence),
     );
 
-    const snapshots = await listSourceSnapshots(repository, project.id);
+    const snapshots = await listSourceSnapshots(repository, ownerId, project.id);
     expect(snapshots.snapshots.map((entry) => entry.id)).toContain(snapshot.id);
   }, 30_000);
 });

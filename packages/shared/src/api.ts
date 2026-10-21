@@ -56,6 +56,21 @@ export const MAX_HISTORY_PAGE_SIZE = 50;
 /* Request schemas                                                            */
 /* -------------------------------------------------------------------------- */
 
+export const registerRequestSchema = z.object({
+  email: z.string().trim().toLowerCase().max(320).email("Enter a valid email address."),
+  password: z
+    .string()
+    .min(12, "Password must be at least 12 characters.")
+    .max(200, "Password must be at most 200 characters."),
+});
+export type RegisterRequest = z.infer<typeof registerRequestSchema>;
+
+export const loginRequestSchema = z.object({
+  email: z.string().trim().toLowerCase().max(320).email("Enter a valid email address."),
+  password: z.string().min(1, "Enter your password.").max(200),
+});
+export type LoginRequest = z.infer<typeof loginRequestSchema>;
+
 export const createProjectRequestSchema = z.object({
   name: z.string().trim().min(1).max(120),
   description: z.string().trim().max(2000).optional(),
@@ -132,6 +147,23 @@ export type ZipSourceFields = z.infer<typeof zipSourceFieldsSchema>;
 /* -------------------------------------------------------------------------- */
 /* Response DTOs                                                              */
 /* -------------------------------------------------------------------------- */
+
+export type AuthUserDto = {
+  id: string;
+  email: string;
+  createdAt: string;
+};
+
+/**
+ * Session payload returned by register, login, and `/auth/me`. The session
+ * token itself is only stored in an HttpOnly cookie; the CSRF token is sent in
+ * the response body and must accompany unsafe requests in `X-CSRF-Token`.
+ */
+export type AuthSessionResponse = {
+  user: AuthUserDto;
+  csrfToken: string;
+  expiresAt: string;
+};
 
 export type ProjectDto = {
   id: string;

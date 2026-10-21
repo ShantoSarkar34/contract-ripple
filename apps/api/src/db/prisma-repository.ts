@@ -6,9 +6,11 @@ import type {
   Prisma,
   PrismaClient,
   Project as ProjectRow,
+  Session as SessionRow,
   SourceFile as SourceFileRow,
   SourceImpact as SourceImpactRow,
   SourceSnapshot as SourceSnapshotRow,
+  User as UserRow,
 } from "@prisma/client";
 import {
   CHANGE_TYPES,
@@ -30,6 +32,7 @@ import type {
   AnalysisRunRecord,
   AnalysisRunScopeRecord,
   AnalysisRunWithVersions,
+  ConsumeRateLimitInput,
   ContractRecord,
   ContractRecordWithCount,
   ContractVersionRecord,
@@ -38,18 +41,24 @@ import type {
   CreateContractInput,
   CreateContractVersionInput,
   CreateProjectInput,
+  CreateSessionInput,
   CreateSourceSnapshotInput,
+  CreateUserInput,
   FindingRecord,
   ListAnalysisRunsPageOptions,
   ProjectRecord,
   ProjectRecordWithCount,
+  RateLimitResult,
   Repository,
+  SessionRecord,
+  SessionWithUserRecord,
   SourceFileRecord,
   SourceImpactRecord,
   SourceSnapshotDetailRecord,
   SourceSnapshotRecord,
   SourceSnapshotWithCount,
   UpdateProjectInput,
+  UserRecord,
 } from "./types.js";
 
 type ProjectRowWithCount = ProjectRow & { _count: { contracts: number } };
@@ -68,6 +77,7 @@ type SourceSnapshotRowDetail = SourceSnapshotRow & {
   files: SourceFileRow[];
   impacts: SourceImpactRow[];
 };
+type SessionRowWithUser = SessionRow & { user: UserRow };
 
 function assertOneOf<T extends string>(value: string, allowed: readonly T[], field: string): T {
   if (!(allowed as readonly string[]).includes(value)) {
@@ -80,9 +90,30 @@ function toFormat(value: string): ContractFormat {
   return value === "json" ? "json" : "yaml";
 }
 
+function mapUser(row: UserRow): UserRecord {
+  return {
+    id: row.id,
+    email: row.email,
+    passwordHash: row.passwordHash,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+function mapSession(row: SessionRow): SessionRecord {
+  return {
+    id: row.id,
+    userId: row.userId,
+    tokenHash: row.tokenHash,
+    expiresAt: row.expiresAt,
+    createdAt: row.createdAt,
+  };
+}
+
 function mapProject(row: ProjectRow): ProjectRecord {
   return {
     id: row.id,
+    ownerId: row.ownerId,
     name: row.name,
     description: row.description,
     createdAt: row.createdAt,
@@ -241,15 +272,94 @@ export class PrismaRepository implements Repository {
     await this.prisma.$queryRaw`SELECT 1`;
   }
 
+  async createUser(input: CreateUserInput): Promise<UserRecord> {
+    const row = await this.prisma.user.create({
+      data: { email: input.email, passwordHash: input.passwordHash },
+    });
+    return mapUser(row);
+  }
+
+  async getUserByEmail(email: string): Promise<UserRecord | null> {
+    const row = await this.prisma.user.findUnique({ where: { email } });
+    return row ? mapUser(row) : null;
+  }
+
+  async getUserById(id: string): Promise<UserRecord | null> {
+    const row = await this.prisma.user.findUnique({ where: { id } });
+    return row ? mapUser(row) : null;
+  }
+
+  async createSession(input: CreateSessionInput): Promise<SessionRecord> {
+    const row = await this.prisma.session.create({
+      data: {
+        userId: input.userId,
+        tokenHash: input.tokenHash,
+        expiresAt: input.expiresAt,
+      },
+    });
+    return mapSession(row);
+  }
+
+  async getSessionByTokenHash(tokenHash: string): Promise<SessionWithUserRecord | null> {
+    const row = (await this.prisma.session.findUnique({
+      where: { tokenHash },
+      include: { user: true },
+    })) as SessionRowWithUser | null;
+    return row ? { ...mapSession(row), user: mapUser(row.user) } : null;
+  }
+
+  async deleteSessionByTokenHash(tokenHash: string): Promise<void> {
+    await this.prisma.session.deleteMany({ where: { tokenHash } });
+  }
+
+  async consumeRateLimit(input: ConsumeRateLimitInput): Promise<RateLimitResult> {
+    const now = input.now ?? new Date();
+    const resetAt = new Date(now.getTime() + input.windowMs);
+    const rows = await this.prisma.$queryRaw<Array<{ count: number; resetAt: Date }>>`
+      INSERT INTO "RateLimitBucket" ("key", "count", "resetAt", "updatedAt")
+      VALUES (${input.key}, 1, ${resetAt}, ${now})
+      ON CONFLICT ("key") DO UPDATE SET
+        "count" = CASE
+          WHEN "RateLimitBucket"."resetAt" <= ${now} THEN 1
+          ELSE "RateLimitBucket"."count" + 1
+        END,
+        "resetAt" = CASE
+          WHEN "RateLimitBucket"."resetAt" <= ${now} THEN ${resetAt}
+          ELSE "RateLimitBucket"."resetAt"
+        END,
+        "updatedAt" = ${now}
+      RETURNING "count", "resetAt"
+    `;
+    const row = rows[0];
+    if (!row) {
+      throw new Error("Rate limit counter could not be updated.");
+    }
+
+    return {
+      allowed: row.count <= input.limit,
+      remaining: Math.max(0, input.limit - row.count),
+      retryAfterSeconds: Math.max(
+        1,
+        Math.ceil((row.resetAt.getTime() - now.getTime()) / 1000),
+      ),
+      resetAt: row.resetAt,
+    };
+  }
+
   async createProject(input: CreateProjectInput): Promise<ProjectRecord> {
     const row = await this.prisma.project.create({
-      data: { name: input.name, description: input.description ?? null },
+      data: {
+        ownerId: input.ownerId,
+        name: input.name,
+        description: input.description ?? null,
+      },
     });
     return mapProject(row);
   }
 
-  async listProjects(): Promise<ProjectRecordWithCount[]> {
+  async listProjects(ownerId: string): Promise<ProjectRecordWithCount[]> {
     const rows = await this.prisma.project.findMany({
+      where: { ownerId },
       orderBy: { createdAt: "asc" },
       include: { _count: { select: { contracts: true } } },
     });

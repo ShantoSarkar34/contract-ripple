@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import ContractsWorkspace from "@/components/contracts/contracts-workspace";
+import ContractsGate from "@/components/contracts/contracts-gate";
 
 export const metadata: Metadata = {
   title: "Contracts — ContractRipple",
@@ -8,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function ContractsPage() {
-  return <ContractsWorkspace />;
+  return <ContractsGate />;
 }

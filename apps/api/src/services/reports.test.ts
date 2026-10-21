@@ -1,23 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { MemoryRepository } from "../db/memory-repository.js";
+import { TEST_OWNER_ID } from "../testing/auth.js";
 import { baselinePetJson, candidatePetJson } from "../testing/fixtures.js";
 import { createComparison } from "./comparisons.js";
 import { createContract, createContractVersion } from "./contracts.js";
 import { createProject } from "./projects.js";
 import { getComparisonReport, renderMarkdownReport } from "./reports.js";
 
-async function seedComparison(repository: MemoryRepository) {
-  const project = await createProject(repository, { name: "Pets" });
-  const contract = await createContract(repository, project.id, { name: "pets-api" });
-  const baseline = await createContractVersion(repository, contract.id, {
+async function seedComparison(repository: MemoryRepository, ownerId = TEST_OWNER_ID) {
+  const project = await createProject(repository, ownerId, { name: "Pets" });
+  const contract = await createContract(repository, ownerId, project.id, { name: "pets-api" });
+  const baseline = await createContractVersion(repository, ownerId, contract.id, {
     content: baselinePetJson,
     label: "v1",
   });
-  const candidate = await createContractVersion(repository, contract.id, {
+  const candidate = await createContractVersion(repository, ownerId, contract.id, {
     content: candidatePetJson,
     label: "v2",
   });
-  const comparison = await createComparison(repository, project.id, {
+  const comparison = await createComparison(repository, ownerId, project.id, {
     baselineVersionId: baseline.id,
     candidateVersionId: candidate.id,
     label: "v1 → v2",
@@ -64,7 +65,7 @@ describe("comparison reports", () => {
     const snapshot = await seedSnapshot(repository, project.id, comparison.id);
     const generatedAt = new Date("2026-04-05T06:07:08.000Z");
 
-    const report = await getComparisonReport(repository, comparison.id, {
+    const report = await getComparisonReport(repository, TEST_OWNER_ID, comparison.id, {
       now: generatedAt,
     });
 
@@ -93,7 +94,7 @@ describe("comparison reports", () => {
     const first = await seedSnapshot(repository, project.id, comparison.id);
     const second = await seedSnapshot(repository, project.id, comparison.id);
 
-    const report = await getComparisonReport(repository, comparison.id);
+    const report = await getComparisonReport(repository, TEST_OWNER_ID, comparison.id);
 
     expect(first.id).not.toBe(second.id);
     expect(report.sourceAnalysis.availableSnapshotCount).toBe(2);
@@ -105,7 +106,7 @@ describe("comparison reports", () => {
     const repository = new MemoryRepository();
     const { comparison } = await seedComparison(repository);
 
-    const report = await getComparisonReport(repository, comparison.id);
+    const report = await getComparisonReport(repository, TEST_OWNER_ID, comparison.id);
 
     expect(report.sourceAnalysis).toEqual({
       availableSnapshotCount: 0,
@@ -118,7 +119,7 @@ describe("comparison reports", () => {
     const repository = new MemoryRepository();
     const { project, comparison } = await seedComparison(repository);
     await seedSnapshot(repository, project.id, comparison.id);
-    const report = await getComparisonReport(repository, comparison.id);
+    const report = await getComparisonReport(repository, TEST_OWNER_ID, comparison.id);
     const markdown = renderMarkdownReport(report);
 
     expect(markdown).toContain("# ContractRipple analysis report");
@@ -136,7 +137,16 @@ describe("comparison reports", () => {
     const repository = new MemoryRepository();
 
     await expect(
-      getComparisonReport(repository, "missing"),
+      getComparisonReport(repository, TEST_OWNER_ID, "missing"),
+    ).rejects.toMatchObject({ status: 404, code: "comparison_not_found" });
+  });
+
+  it("rejects a comparison owned by another user", async () => {
+    const repository = new MemoryRepository();
+    const { comparison } = await seedComparison(repository, "someone-else");
+
+    await expect(
+      getComparisonReport(repository, TEST_OWNER_ID, comparison.id),
     ).rejects.toMatchObject({ status: 404, code: "comparison_not_found" });
   });
 });

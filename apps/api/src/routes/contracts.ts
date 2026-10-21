@@ -7,6 +7,7 @@ import {
 } from "@contract-ripple/shared";
 import type { Repository } from "../db/types.js";
 import { asyncHandler } from "../middleware/async-handler.js";
+import { requireAuth } from "../middleware/auth.js";
 import { parseWithSchema } from "../middleware/validate.js";
 import {
   createContract,
@@ -24,9 +25,11 @@ export function createContractsRouter(repository: Repository): Router {
   router.post(
     "/projects/:projectId/contracts",
     asyncHandler(async (request, response) => {
+      const auth = requireAuth(request);
       const input = parseWithSchema(createContractRequestSchema, request.body);
       const contract = await createContract(
         repository,
+        auth.user.id,
         requiredParam(request, "projectId"),
         input,
       );
@@ -37,7 +40,12 @@ export function createContractsRouter(repository: Repository): Router {
   router.get(
     "/projects/:projectId/contracts",
     asyncHandler(async (request, response) => {
-      const contracts = await listContracts(repository, requiredParam(request, "projectId"));
+      const auth = requireAuth(request);
+      const contracts = await listContracts(
+        repository,
+        auth.user.id,
+        requiredParam(request, "projectId"),
+      );
       const body: ListContractsResponse = { contracts };
       response.status(200).json(body);
     }),
@@ -46,7 +54,12 @@ export function createContractsRouter(repository: Repository): Router {
   router.get(
     "/contracts/:contractId",
     asyncHandler(async (request, response) => {
-      const contract = await getContract(repository, requiredParam(request, "contractId"));
+      const auth = requireAuth(request);
+      const contract = await getContract(
+        repository,
+        auth.user.id,
+        requiredParam(request, "contractId"),
+      );
       response.status(200).json(contract);
     }),
   );
@@ -54,9 +67,11 @@ export function createContractsRouter(repository: Repository): Router {
   router.post(
     "/contracts/:contractId/versions",
     asyncHandler(async (request, response) => {
+      const auth = requireAuth(request);
       const input = parseWithSchema(createContractVersionRequestSchema, request.body);
       const version = await createContractVersion(
         repository,
+        auth.user.id,
         requiredParam(request, "contractId"),
         input,
       );
@@ -67,7 +82,12 @@ export function createContractsRouter(repository: Repository): Router {
   router.get(
     "/contracts/:contractId/versions",
     asyncHandler(async (request, response) => {
-      const versions = await listVersions(repository, requiredParam(request, "contractId"));
+      const auth = requireAuth(request);
+      const versions = await listVersions(
+        repository,
+        auth.user.id,
+        requiredParam(request, "contractId"),
+      );
       const body: ListVersionsResponse = { versions };
       response.status(200).json(body);
     }),
@@ -76,7 +96,12 @@ export function createContractsRouter(repository: Repository): Router {
   router.get(
     "/versions/:versionId",
     asyncHandler(async (request, response) => {
-      const version = await getVersion(repository, requiredParam(request, "versionId"));
+      const auth = requireAuth(request);
+      const version = await getVersion(
+        repository,
+        auth.user.id,
+        requiredParam(request, "versionId"),
+      );
       response.status(200).json(version);
     }),
   );

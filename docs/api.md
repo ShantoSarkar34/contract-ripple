@@ -1,4 +1,4 @@
-# ContractRipple — API reference (Phase 6)
+# ContractRipple — API reference (Phase 7)
 
 Base URL: `/api/v1` (configure the frontend with `NEXT_PUBLIC_API_BASE_URL`,
 for example `http://localhost:4000/api/v1`).
@@ -7,9 +7,64 @@ Most request and response bodies are JSON. Contract text may be JSON or YAML, bu
 it is sent as a JSON string inside the request body. Source ZIP analysis uses
 `multipart/form-data`.
 
-> **Authentication is not implemented yet.** It is deferred to Phase 7. Do not
-> expose this API publicly with real user data until then. There are currently no
-> ownership checks between projects.
+> **Authentication is required for all data routes.** `GET /health`,
+> `GET /ready`, and the `/auth/*` endpoints are the only unauthenticated routes.
+> Every project, contract, version, comparison, report, and source-analysis
+> request is resolved against the authenticated user's project ownership.
+> Unauthorized or unknown owned resources return `404` with the resource's
+> normal not-found code.
+
+## Authentication
+
+Sessions are opaque random tokens stored in an `HttpOnly` cookie named
+`cr_session` with `Path=/api/v1`. Only a SHA-256 hash of the token is stored in
+PostgreSQL. Sessions expire after seven days.
+
+Unsafe requests (`POST`, `PATCH`, `PUT`, `DELETE`) to authenticated routes must
+include the session's CSRF token in the `x-csrf-token` header. The token is an
+HMAC-SHA256 of the raw session token keyed by `AUTH_SECRET`, so it is derived on
+demand and never stored separately.
+
+An `Origin` header that is present on an unsafe request must match
+`CORS_ORIGINS`. Cookie security is controlled by `AUTH_COOKIE_SECURE` (defaults
+to true in production) and `AUTH_COOKIE_SAME_SITE` (`lax`, `strict`, or `none`;
+`none` requires secure cookies).
+
+### `POST /auth/register`
+
+Request: `{ "email": string, "password": string }`. The email is trimmed and
+lowercased. The password must be 12–200 characters. Response `201`:
+
+```json
+{
+  "user": { "id": "cm...", "email": "user@example.com", "createdAt": "2026-01-01T00:00:00.000Z" },
+  "csrfToken": "<base64url hmac>",
+  "expiresAt": "2026-01-08T00:00:00.000Z"
+}
+```
+
+The response sets the session cookie. Duplicate emails return `409 email_taken`.
+Validation failures return `400 validation_error`. Registration is rate limited
+per client IP.
+
+### `POST /auth/login`
+
+Request: `{ "email": string, "password": string }`. Response `200` with the same
+shape as registration and a new session cookie. Unknown emails and wrong
+passwords both return `401 invalid_credentials` and take comparable time. Login
+is rate limited per IP and per email.
+
+### `GET /auth/me`
+
+Returns the current session, including the derived `csrfToken`, or
+`401 unauthenticated`. The frontend calls this on load to restore auth state.
+Responses use `Cache-Control: no-store`.
+
+### `POST /auth/logout`
+
+Requires a valid session and CSRF token. Deletes the session and clears the
+cookie. Response `204`. Calling it without a CSRF token returns
+`403 invalid_csrf` and leaves the session active.
 
 ## Error envelope
 
@@ -30,6 +85,12 @@ return: no stack traces, file paths, or raw contract contents.
 
 | Code | Status | Meaning |
 | --- | --- | --- |
+| `unauthenticated` | 401 | No valid session cookie, or the session expired |
+| `invalid_credentials` | 401 | Email/password combination is incorrect |
+| `invalid_csrf` | 403 | Missing or invalid `x-csrf-token` |
+| `invalid_origin` | 403 | `Origin` header is not allowed by `CORS_ORIGINS` |
+| `email_taken` | 409 | An account already uses that email |
+| `rate_limited` | 429 | A fixed-window rate limit was exceeded (`Retry-After` set) |
 | `validation_error` | 400 | Request body or query failed schema validation |
 | `invalid_request` | 400 | Missing route parameter |
 | `empty_input` | 400 | Contract content was empty |
@@ -90,6 +151,18 @@ return: no stack traces, file paths, or raw contract contents.
   impacts. Regression suggestions keep up to 20 evidence strings each; all
   finding ids remain present.
 - Reports are not cached (`Cache-Control: no-store`).
+- Rate limits are fixed-window and database-backed. Defaults:
+  - Registration: 10/hour per client IP.
+  - Login: 30/15 minutes per client IP and 10/15 minutes per email.
+  - Project creation: 60/hour per user.
+  - Comparison creation: 120/hour per user.
+  - Source analysis: 30/hour per user.
+  Exceeding a limit returns `429 rate_limited` with `Retry-After` and
+  `details.retryAfterSeconds`.
+- Authenticated JSON bodies are limited to 8 MiB; auth request bodies use a
+  smaller dedicated limit. ZIP uploads are limited to 10 MiB. The deployed
+  Vercel Function body limit (4.5 MB) still applies at the platform edge; see
+  `docs/deployment.md`.
 
 ## Health
 
@@ -111,6 +184,10 @@ otherwise.
 ```
 
 ## Projects
+
+All routes below require a valid session. Listing returns only projects owned by
+the caller. Reading, updating, or referencing another user's project returns
+`404 project_not_found`; nested resources return their own not-found code.
 
 ### `POST /projects`
 

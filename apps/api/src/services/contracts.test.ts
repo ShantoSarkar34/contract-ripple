@@ -7,6 +7,7 @@ import {
   invalidOpenApiJson,
   malformedContent,
 } from "../testing/fixtures.js";
+import { TEST_OWNER_ID } from "../testing/auth.js";
 import {
   createContract,
   createContractVersion,
@@ -19,17 +20,21 @@ import { createProject } from "./projects.js";
 
 async function seedContract(): Promise<{ repository: MemoryRepository; contractId: string }> {
   const repository = new MemoryRepository();
-  const project = await createProject(repository, { name: "Pets" });
-  const contract = await createContract(repository, project.id, { name: "pets-api" });
+  const project = await createProject(repository, TEST_OWNER_ID, { name: "Pets" });
+  const contract = await createContract(repository, TEST_OWNER_ID, project.id, {
+    name: "pets-api",
+  });
   return { repository, contractId: contract.id };
 }
 
 describe("contract services", () => {
   it("creates a contract inside an existing project", async () => {
     const repository = new MemoryRepository();
-    const project = await createProject(repository, { name: "Pets" });
+    const project = await createProject(repository, TEST_OWNER_ID, { name: "Pets" });
 
-    const contract = await createContract(repository, project.id, { name: "pets-api" });
+    const contract = await createContract(repository, TEST_OWNER_ID, project.id, {
+      name: "pets-api",
+    });
 
     expect(contract.projectId).toBe(project.id);
     expect(contract.name).toBe("pets-api");
@@ -39,16 +44,27 @@ describe("contract services", () => {
   it("rejects a contract for an unknown project", async () => {
     const repository = new MemoryRepository();
 
-    await expect(createContract(repository, "missing", { name: "pets" })).rejects.toMatchObject({
+    await expect(
+      createContract(repository, TEST_OWNER_ID, "missing", { name: "pets" }),
+    ).rejects.toMatchObject({
       status: 404,
       code: "project_not_found",
     });
   });
 
+  it("rejects a contract for another owner's project", async () => {
+    const repository = new MemoryRepository();
+    const project = await createProject(repository, "someone-else", { name: "Secret" });
+
+    await expect(
+      createContract(repository, TEST_OWNER_ID, project.id, { name: "pets" }),
+    ).rejects.toMatchObject({ status: 404, code: "project_not_found" });
+  });
+
   it("uploads a validated JSON version with parsed metadata", async () => {
     const { repository, contractId } = await seedContract();
 
-    const version = await createContractVersion(repository, contractId, {
+    const version = await createContractVersion(repository, TEST_OWNER_ID, contractId, {
       content: baselinePetJson,
       format: "json",
       label: "v1",
@@ -65,7 +81,7 @@ describe("contract services", () => {
   it("detects YAML when no format is provided", async () => {
     const { repository, contractId } = await seedContract();
 
-    const version = await createContractVersion(repository, contractId, {
+    const version = await createContractVersion(repository, TEST_OWNER_ID, contractId, {
       content: baselinePetYaml,
     });
 
@@ -77,7 +93,9 @@ describe("contract services", () => {
     const { repository, contractId } = await seedContract();
 
     await expect(
-      createContractVersion(repository, contractId, { content: invalidOpenApiJson }),
+      createContractVersion(repository, TEST_OWNER_ID, contractId, {
+        content: invalidOpenApiJson,
+      }),
     ).rejects.toBeInstanceOf(EngineError);
   });
 
@@ -85,18 +103,26 @@ describe("contract services", () => {
     const { repository, contractId } = await seedContract();
 
     await expect(
-      createContractVersion(repository, contractId, { content: malformedContent }),
+      createContractVersion(repository, TEST_OWNER_ID, contractId, {
+        content: malformedContent,
+      }),
     ).rejects.toBeInstanceOf(EngineError);
   });
 
   it("lists contracts and versions in insertion order", async () => {
     const { repository, contractId } = await seedContract();
-    await createContractVersion(repository, contractId, { content: baselinePetJson, label: "v1" });
-    await createContractVersion(repository, contractId, { content: baselinePetYaml, label: "v2" });
+    await createContractVersion(repository, TEST_OWNER_ID, contractId, {
+      content: baselinePetJson,
+      label: "v1",
+    });
+    await createContractVersion(repository, TEST_OWNER_ID, contractId, {
+      content: baselinePetYaml,
+      label: "v2",
+    });
 
-    const project = await repository.getProject((await repository.getContract(contractId))!.projectId);
-    const contracts = await listContracts(repository, project!.id);
-    const versions = await listVersions(repository, contractId);
+    const contract = await repository.getContract(contractId);
+    const contracts = await listContracts(repository, TEST_OWNER_ID, contract!.projectId);
+    const versions = await listVersions(repository, TEST_OWNER_ID, contractId);
 
     expect(contracts).toHaveLength(1);
     expect(contracts[0]?.versionCount).toBe(2);
@@ -105,14 +131,34 @@ describe("contract services", () => {
 
   it("returns a contract with its versions and a version with its raw content", async () => {
     const { repository, contractId } = await seedContract();
-    const created = await createContractVersion(repository, contractId, {
+    const created = await createContractVersion(repository, TEST_OWNER_ID, contractId, {
       content: baselinePetJson,
     });
 
-    const contract = await getContract(repository, contractId);
-    const version = await getVersion(repository, created.id);
+    const contract = await getContract(repository, TEST_OWNER_ID, contractId);
+    const version = await getVersion(repository, TEST_OWNER_ID, created.id);
 
     expect(contract.versions).toHaveLength(1);
     expect(version.content).toBe(baselinePetJson);
+  });
+
+  it("hides another owner's contract and version ids", async () => {
+    const repository = new MemoryRepository();
+    const project = await createProject(repository, "someone-else", { name: "Secret" });
+    const contract = await createContract(repository, "someone-else", project.id, {
+      name: "secret-api",
+    });
+    const version = await createContractVersion(repository, "someone-else", contract.id, {
+      content: baselinePetJson,
+    });
+
+    await expect(getContract(repository, TEST_OWNER_ID, contract.id)).rejects.toMatchObject({
+      status: 404,
+      code: "contract_not_found",
+    });
+    await expect(getVersion(repository, TEST_OWNER_ID, version.id)).rejects.toMatchObject({
+      status: 404,
+      code: "version_not_found",
+    });
   });
 });
