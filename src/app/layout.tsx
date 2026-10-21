@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import Navbar from "@/components/navbar";
 import { AuthProvider } from "@/components/auth-provider";
 import "./globals.css";
 
@@ -20,17 +19,18 @@ export const metadata: Metadata = {
     "A developer-focused platform to manage API contract versions, review differences, explore impact reports, and organize analysis history.",
 };
 
+/**
+ * Root layout only owns the document, fonts and the session provider. Each
+ * route group supplies its own shell: marketing, authentication or workspace.
+ */
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col text-foreground antialiased">
-        <AuthProvider>
-          <Navbar />
-          <main className="flex-1">{children}</main>
-        </AuthProvider>
+      <body className="min-h-full bg-background text-foreground antialiased">
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );

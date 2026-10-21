@@ -46,14 +46,52 @@ Remaining, deferred to later phases: sortable table columns, a sticky table head
 authentication-aware UI (Phase 7). A manual theme toggle is not required while the app follows the
 operating-system preference.
 
+## Phase 8 — product redesign
+
+The redesign is being delivered in stages. Stage 1 audited the live UI; Stage 2 replaced the global
+navbar with three purpose-built shells and consolidated the visual system.
+
+### Stage 2 — design system and application shells
+
+- **Route groups:** `(marketing)`, `(auth)`, and `(workspace)` now own their layouts. The root layout
+  only provides the document, fonts, and `AuthProvider`. URLs are unchanged (`/`, `/login`,
+  `/contracts`).
+- **Marketing shell:** `components/layout/site-header.tsx` + `site-footer.tsx`. The header keeps the
+  session-aware actions, uses a 64 px sticky bar, and the mobile menu is a disclosure with
+  `aria-expanded`/`aria-controls`, Escape handling, and 44 px touch targets. The dead `/impact` CTA
+  now scrolls to `#impact-demo`; the demo surfaces carry visible "Sample data" / "Demo data" labels.
+- **Authentication shell:** `(auth)/layout.tsx` adds a minimal brand bar with a back link; the form is
+  ordered first on small screens and field-level email/password checks run before the request.
+- **Workspace shell:** `components/workspace/workspace-shell.tsx` provides a fixed dark sidebar
+  (256 px) from `lg`, a 64 px sticky top bar with breadcrumb and account, and a mobile navigation
+  drawer built on the shared `Dialog`. The drawer traps focus, closes on Escape, locks page scroll,
+  restores focus, and is labelled by its heading. `aria-current` marks the active page.
+- **Design tokens:** page, surface, line, muted text, brand, accent, focus, and paired status colors
+  live as RGB channel variables in `globals.css`; light and dark values are defined per token. Status
+  text/background pairs were re-picked for contrast (accessibility score moved from 0.96 to 1.00).
+  The sidebar uses fixed dark tokens in both schemes.
+- **Primitives:** `components/ui/` adds `Button`, `Card` (+ header/title/description/content/footer),
+  `Badge`, `Field`/`Input`/`Textarea`/`Select`, `Alert`, `Skeleton`/`SkeletonText`/`SkeletonCard`,
+  `EmptyState`, `PageHeader`, and an accessible `Dialog`.
+- **Chrome fixes:** the demo impact table is now horizontally scrollable with an accessible caption,
+  the recent-activity table has a caption and a visible demo badge, feature emoji were replaced with
+  stroke icons, and the decorative hero blobs were removed.
+- **Verified:** no page-level horizontal overflow at 320, 375, 390, 430, 768, 1024, 1280, or 1440 px
+  on `/`, `/login`, and `/contracts`. Lighthouse accessibility on `/` is 1.00.
+
+Deferred to later stages: authenticated workspace content at viewport widths, mobile card layouts for
+the findings and relationships tables, graph keyboard selection/zoom, per-field validation styling,
+and a manual theme toggle (the product still follows the OS preference).
+
 ## Current UI inventory
 
-- `navbar.tsx` — sticky navigation, brand mark, four links, sign-in/get-started actions.
-- `hero.tsx` — badge, headline, description, two CTAs, decorative gradient blobs.
-- `features.tsx` — four feature cards with emoji icons.
-- `impact-report-demo.tsx` — demo diff table and "recommended next steps" callout.
-- `recent-activity.tsx` — demo review table with colored status pills.
-- `app/layout.tsx`, `app/globals.css`, Tailwind v3 design tokens.
+- `components/layout/` — brand mark, marketing header/footer.
+- `components/workspace/workspace-shell.tsx` — sidebar, top bar, mobile drawer, account actions.
+- `components/ui/` — cards, buttons, badges, fields, alerts, skeletons, empty states, dialog.
+- `hero.tsx`, `features.tsx`, `impact-report-demo.tsx`, `recent-activity.tsx` — landing sections,
+  with demo content labeled.
+- `app/(marketing)`, `app/(auth)`, `app/(workspace)` — route-group layouts; `app/globals.css` and
+  `tailwind.config.js` hold the token system.
 
 ## Typography
 
