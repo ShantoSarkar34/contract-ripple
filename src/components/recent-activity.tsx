@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Badge, type BadgeTone } from "@/components/ui/badge";
 
 type Activity = {
   contract: string;
@@ -15,56 +16,82 @@ const ACTIVITIES: Activity[] = [
   { contract: "notifications-api", version: "v4.0.2", author: "dave.kim", time: "2d ago", status: "reviewed" },
 ];
 
-const STATUS_CONFIG = {
-  reviewed: { bg: "bg-slate-100 dark:bg-slate-800", text: "text-slate-700 dark:text-slate-300", dot: "bg-slate-500 dark:bg-slate-400" },
-  pending: { bg: "bg-warning-light dark:bg-warning/20", text: "text-warning dark:text-warning", dot: "bg-warning dark:bg-warning" },
-  approved: { bg: "bg-success-light dark:bg-success/20", text: "text-success dark:text-success", dot: "bg-success dark:bg-success" },
-} as const;
+const STATUS_TONE: Record<Activity["status"], BadgeTone> = {
+  reviewed: "neutral",
+  pending: "warning",
+  approved: "success",
+};
 
 export default function RecentActivity() {
   return (
-    <section className="px-4 py-12 md:px-8 md:py-16">
-      <div className="max-w-3xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-foreground">Recent contract reviews</h2>
-          <Link href="/history" className="btn-ghost">
-            View all →
+    <section className="px-4 py-16 md:px-6 md:py-20">
+      <div className="mx-auto max-w-4xl">
+        <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-xl font-semibold tracking-tight text-foreground">
+                Recent contract reviews
+              </h2>
+              <Badge tone="outline">Demo data</Badge>
+            </div>
+            <p className="mt-1 text-sm text-muted">
+              Example activity from a sample team workspace.
+            </p>
+          </div>
+          <Link href="/contracts" className="btn-ghost">
+            Open workspace
+            <span aria-hidden="true">→</span>
           </Link>
         </div>
+
         <div className="card overflow-hidden">
-          <table className="w-full text-left divide-y divide-slate-200/50 dark:divide-slate-800/50">
-            <thead>
-              <tr className="bg-slate-50 dark:bg-slate-800/50">
-                <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Contract</th>
-                <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Version</th>
-                <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Author</th>
-                <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Time</th>
-                <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ACTIVITIES.map((a, i) => {
-                const style = STATUS_CONFIG[a.status];
-                return (
-                  <tr key={i} className="hover:bg-slate-50/30 dark:hover:bg-slate-800/30 transition-colors">
-                    <td className="px-6 py-4 font-mono text-sm text-slate-700 dark:text-slate-300">{a.contract}</td>
-                    <td className="px-6 py-4 font-mono text-sm text-slate-700 dark:text-slate-300">{a.version}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">{a.author}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">{a.time}</td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${style.bg} ${style.text}`}>
-                        <span className="mr-1.5 h-1.5 w-1.5 rounded-full ${style.dot}"></span>
-                        {a.status}
-                      </span>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[34rem] border-collapse text-left">
+              <caption className="sr-only">
+                Demo contract review activity. Sample data, not a real analysis.
+              </caption>
+              <thead>
+                <tr className="border-b border-line bg-surface-muted">
+                  <th scope="col" className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-subtle">
+                    Contract
+                  </th>
+                  <th scope="col" className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-subtle">
+                    Version
+                  </th>
+                  <th scope="col" className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-subtle">
+                    Author
+                  </th>
+                  <th scope="col" className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-subtle">
+                    Time
+                  </th>
+                  <th scope="col" className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-subtle">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {ACTIVITIES.map((activity) => (
+                  <tr key={`${activity.contract}-${activity.version}`} className="transition-colors hover:bg-surface-muted">
+                    <th scope="row" className="px-5 py-3.5 font-mono text-sm font-medium text-foreground">
+                      {activity.contract}
+                    </th>
+                    <td className="px-5 py-3.5 font-mono text-sm text-muted">{activity.version}</td>
+                    <td className="px-5 py-3.5 text-sm text-muted">{activity.author}</td>
+                    <td className="px-5 py-3.5 text-sm text-muted">{activity.time}</td>
+                    <td className="px-5 py-3.5">
+                      <Badge tone={STATUS_TONE[activity.status]} withDot>
+                        {activity.status}
+                      </Badge>
                     </td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-        <p className="mt-4 text-xs text-slate-500 dark:text-slate-500">
-          Demo data — connect your backend to see real contract reviews.
+
+        <p className="mt-3 text-xs text-subtle">
+          Demo data — sign in to see analyses from your own projects.
         </p>
       </div>
     </section>

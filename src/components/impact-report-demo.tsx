@@ -21,52 +21,64 @@ const TYPE_CONFIG = {
 
 export default function ImpactReportDemo() {
   return (
-    <section className="px-4 py-16 md:px-8 md:py-24">
+    <section id="impact-demo" className="scroll-mt-20 px-4 py-16 md:px-6 md:py-20">
       <div className="max-w-4xl mx-auto">
         <div className="flex flex-col md:flex-row items-center justify-between mb-10 gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-foreground tracking-tight">Demo impact report</h2>
-            <p className="text-slate-600 dark:text-slate-400 text-sm mt-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-2xl font-semibold tracking-tight text-foreground">
+                Demo impact report
+              </h2>
+              <span className="badge border border-line-strong bg-surface text-subtle">
+                Sample data
+              </span>
+            </div>
+            <p className="mt-1 text-sm text-muted">
               Sample diff between contract versions{" "}
               <span className="font-mono text-primary">v2.1.0 → v2.2.0</span>
             </p>
           </div>
-          <span className="inline-flex items-center rounded-full border border-slate-200 dark:border-slate-700 px-3 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 shadow-sm">
+          <span className="inline-flex items-center rounded-full border border-line-strong bg-surface px-3 py-1 text-xs font-medium text-muted shadow-sm">
             5 changes detected
           </span>
         </div>
 
         <div className="card overflow-hidden">
-          <table className="w-full text-left border-b border-slate-200/50 dark:border-slate-800/50">
-            <thead>
-              <tr className="bg-slate-50 dark:bg-slate-800/50 sticky top-0 z-10">
-                <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
-                <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Method</th>
-                <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Endpoint</th>
-                <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Detail</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200/50 dark:divide-slate-800/50">
-              {CHANGES.map((change, i) => {
-                const style = TYPE_CONFIG[change.type];
-                return (
-                  <tr key={i} className="hover:bg-slate-50/30 dark:hover:bg-slate-800/30 transition-colors">
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-bold border ${style.badge}`}>
-                        <span className={`mr-2 h-1.5 w-1.5 rounded-full ${style.dot}`} />
-                        {style.label}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 font-mono text-sm text-primary">{change.method}</td>
-                    <td className="px-6 py-4 font-mono text-sm text-slate-700 dark:text-slate-300">
-                      {change.path}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">{change.detail}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[40rem] border-b border-line text-left">
+              <caption className="sr-only">
+                Demo impact report: sample contract changes between two example versions.
+              </caption>
+              <thead>
+                <tr className="bg-surface-muted">
+                  <th scope="col" className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-subtle">Type</th>
+                  <th scope="col" className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-subtle">Method</th>
+                  <th scope="col" className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-subtle">Endpoint</th>
+                  <th scope="col" className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-subtle">Detail</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {CHANGES.map((change, i) => {
+                  const style = TYPE_CONFIG[change.type];
+                  return (
+                    <tr key={i} className="transition-colors hover:bg-surface-muted">
+                      <td className="px-5 py-4">
+                        <span className={`inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-bold ${style.badge}`}>
+                          <span className={`mr-2 h-1.5 w-1.5 rounded-full ${style.dot}`} />
+                          {style.label}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 font-mono text-sm text-primary">{change.method}</td>
+                      <td className="px-5 py-4 font-mono text-sm text-muted">
+                        {change.path}
+                      </td>
+                      <td className="px-5 py-4 text-sm text-muted">{change.detail}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div className="mt-8 card p-6">

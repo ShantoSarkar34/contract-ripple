@@ -551,7 +551,7 @@ export default function ContractsWorkspace() {
         </div>
       </header>
 
-      <div className="sticky top-14 z-30 -mx-4 mb-6 border-y border-slate-200/70 bg-background/85 px-4 py-2 backdrop-blur md:-mx-8 md:px-8 dark:border-slate-800/70">
+      <div className="sticky top-16 z-10 -mx-4 mb-6 border-y border-line/70 bg-background/85 px-4 py-2 backdrop-blur md:-mx-8 md:px-8">
         <nav
           aria-label="Workspace context"
           className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400"

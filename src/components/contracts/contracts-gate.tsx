@@ -13,9 +13,9 @@ export default function ContractsGate() {
 
   if (status === "checking") {
     return (
-      <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-8">
+      <div className="mx-auto w-full max-w-3xl px-4 py-10 md:px-6">
         <div className="card p-6" role="status" aria-live="polite">
-          <p className="text-sm text-slate-500 dark:text-slate-400">Checking your session…</p>
+          <p className="text-sm text-muted">Checking your session…</p>
         </div>
       </div>
     );
@@ -23,10 +23,10 @@ export default function ContractsGate() {
 
   if (status === "error") {
     return (
-      <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-8">
+      <div className="mx-auto w-full max-w-3xl px-4 py-10 md:px-6">
         <div className="card p-6">
           <h1 className="text-lg font-semibold">Could not verify your session</h1>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          <p className="mt-2 text-sm leading-6 text-muted">
             {error ?? "The API did not respond as expected."}
           </p>
           <button type="button" className="btn-primary mt-4" onClick={() => void refresh()}>
@@ -39,10 +39,10 @@ export default function ContractsGate() {
 
   if (status !== "authenticated" || !user) {
     return (
-      <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-8">
+      <div className="mx-auto w-full max-w-3xl px-4 py-10 md:px-6">
         <div className="card max-w-xl p-6">
           <h1 className="text-xl font-semibold tracking-tight">Sign in to use the workspace</h1>
-          <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+          <p className="mt-2 text-sm leading-6 text-muted">
             Projects, contract versions, comparisons, source analysis, and report downloads are
             private to the account that created them.
           </p>
