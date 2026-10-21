@@ -61,14 +61,21 @@ Moving the frontend is not performed in this phase because it risks breaking the
 
 ### Frontend (`src/`)
 - Rendering, routing, interaction, and presentation only.
-- Calls the backend through a configurable base URL (`NEXT_PUBLIC_API_BASE_URL`).
+- Calls the backend through a configurable base URL (`NEXT_PUBLIC_API_BASE_URL`),
+  either directly or through the optional same-origin `/api/v1` rewrite
+  (`API_PROXY_TARGET`) so the session cookie stays first-party.
+- Restores the session with `GET /auth/me`, keeps the CSRF token in memory, and
+  reacts to `401` by clearing auth state and prompting sign-in.
 - Must display real loading, empty, success, error, and partial states.
 - Must not embed business logic that belongs in the engine or API.
 - Must never silently substitute demo findings when a request fails.
 
 ### Backend (`apps/api/`)
 - Express application exposing a versioned REST API under `/api/v1`.
-- Validates requests, enforces limits, applies CORS allowlists, and returns consistent errors.
+- Authenticates every data route from an opaque session cookie, enforces CSRF on
+  unsafe methods, resolves project ownership on the server, applies rate limits,
+  validates requests, applies CORS allowlists, sets security headers, and
+  returns consistent errors.
 - Calls the analysis engine; the engine is not duplicated in the API layer.
 - Owns persistence through Prisma.
 - Never trusts client-side authorization.
@@ -154,12 +161,14 @@ Compare stored baseline ↔ candidate ──► AnalysisRun + Finding rows (clas
         └──► Report exports (JSON + Markdown; latest attached source snapshot)
 ```
 
-## API surface (implemented in Phase 6)
+## API surface (implemented in Phase 7)
 
 Under `/api/v1`:
 
 - `GET /health` — liveness.
 - `GET /ready` — readiness, including database connectivity (`200`/`503`).
+- Auth: `POST /auth/register`, `POST /auth/login`, `GET /auth/me`,
+  `POST /auth/logout`.
 - Projects: `POST /projects`, `GET /projects`, `GET /projects/:projectId`,
   `PATCH /projects/:projectId`.
 - Contracts: `POST /projects/:projectId/contracts`,
@@ -179,8 +188,9 @@ Under `/api/v1`:
 The impact graph is a client-side projection of the comparison and source DTOs;
 it adds no endpoints or database tables.
 
-See `docs/api.md` for request/response shapes and error codes. All mutating
-endpoints will require authentication and ownership checks in Phase 7.
+See `docs/api.md` for request/response shapes and error codes. All data routes
+require authentication; every nested resource is resolved through its owning
+project and checked against the session user.
 
 ## Security boundaries
 
@@ -191,22 +201,34 @@ endpoints will require authentication and ownership checks in Phase 7.
   symlink entries cannot escape or write outside a controlled location.
 - GitHub credentials remain server-side, are redacted from logs, and are never returned to clients.
 - No secrets in logs, client responses, or repository files.
-- CORS uses an explicit origin allowlist from environment configuration.
+- Passwords use `scrypt`; session tokens are opaque random values and only their
+  SHA-256 hashes are stored. The session cookie is `HttpOnly`, `SameSite=Lax` by
+  default, and `Secure` in production.
+- CSRF tokens are derived with HMAC-SHA256 from the session token and
+  `AUTH_SECRET`; unsafe requests must send `x-csrf-token`.
+- An `Origin` header that is present on an unsafe request must match
+  `CORS_ORIGINS`.
+- CORS uses an explicit origin allowlist from environment configuration and is
+  credential-aware. CORS is not an authorization boundary.
+- Rate limits are fixed-window and database-backed; bucket keys are SHA-256
+  hashes of scoped IPs/emails/users, not raw identifiers.
 
-## Persistence (implemented in Phase 6)
+## Persistence (implemented in Phase 7)
 
 Prisma + PostgreSQL. Models: `Project`, `Contract`, `ContractVersion`,
-`AnalysisRun`, `Finding`, `SourceSnapshot`, `SourceFile`, and `SourceImpact`,
-with `AnalysisStatus` as a Postgres enum. Phases 5 and 6 add no schema changes;
-the impact graph, pagination, reports, and regression suggestions are derived
-from these records. Cascading deletes remove contracts,
-versions, runs, findings, and source snapshots with their parent project (source
-snapshots keep their comparison via `onDelete: SetNull`). `ContractVersion`
-stores untrusted spec text plus a SHA-256 checksum; `Finding` and `SourceImpact`
-keep their order via `position`. Source snapshots store file metadata and
-evidence snippets, not full file contents. Ownership fields are added with
-authentication in Phase 7. Migrations live in `apps/api/prisma/migrations` and
-are applied with `prisma migrate deploy`.
+`AnalysisRun`, `Finding`, `SourceSnapshot`, `SourceFile`, `SourceImpact`, `User`,
+`Session`, and `RateLimitBucket`, with `AnalysisStatus` as a Postgres enum.
+Phase 7 adds authentication, ownership, and rate-limit storage; the impact
+graph, pagination, reports, and regression suggestions remain derived from
+analysis records. Cascading deletes remove contracts, versions, runs, findings,
+and source snapshots with their parent project (source snapshots keep their
+comparison via `onDelete: SetNull`); sessions and owned projects cascade from
+their user. `ContractVersion` stores untrusted spec text plus a SHA-256 checksum;
+`Finding` and `SourceImpact` keep their order via `position`. Source snapshots
+store file metadata and evidence snippets, not full file contents.
+`Project.ownerId` is nullable so the Phase 7 migration is safe for existing rows;
+legacy projects are inaccessible until an owner is assigned. Migrations live in
+`apps/api/prisma/migrations` and are applied with `prisma migrate deploy`.
 
 ## Deployment
 
@@ -219,7 +241,6 @@ are applied with `prisma migrate deploy`.
 
 ## Open decisions
 
-- Backend hosting provider (decided in Phase 7 after runtime requirements are verified).
 - Full monorepo move of the frontend to `apps/web` (separate approved migration).
 - OpenAPI parser/diff library choice — resolved in Phase 2 and documented in
   `docs/engine.md`.
@@ -229,3 +250,9 @@ are applied with `prisma migrate deploy`.
 - Report format and storage — resolved in Phase 6: generate JSON and Markdown on
   request from persisted records, include the latest source snapshot, and store
   no report artifacts. See `docs/reports.md`.
+- Authentication model — resolved in Phase 7: email/password, opaque
+  database-backed sessions, derived CSRF tokens, server-side ownership, and
+  database-backed fixed-window rate limits. See `docs/api.md` and
+  `docs/release-checklist.md`.
+- Production rollout — prepared but not executed in Phase 7. Merging and
+  deploying require explicit approval; see `docs/release-checklist.md`.

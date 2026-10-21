@@ -14,6 +14,12 @@ import type {
 import { createApp } from "../create-app.js";
 import { MemoryRepository } from "../db/memory-repository.js";
 import {
+  registerTestUser,
+  TEST_AUTH_SECRET,
+  withSession,
+  type TestSession,
+} from "../testing/auth.js";
+import {
   baselinePetJson,
   candidatePetJson,
   invalidOpenApiJson,
@@ -23,13 +29,18 @@ import {
 import { startTestServer, type TestServer } from "../testing/http.js";
 
 let server: TestServer;
+let session: TestSession;
 
 beforeAll(async () => {
   const app = createApp({
     corsOrigins: ["http://localhost:3000"],
     repository: new MemoryRepository(),
+    authSecret: TEST_AUTH_SECRET,
+    nodeEnv: "test",
+    trustProxy: false,
   });
   server = await startTestServer(app);
+  session = await registerTestUser(server.baseUrl);
 });
 
 afterAll(async () => {
@@ -37,18 +48,15 @@ afterAll(async () => {
 });
 
 async function api(path: string, init?: RequestInit): Promise<Response> {
-  return fetch(`${server.baseUrl}/api/v1${path}`, {
-    ...init,
-    headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
-  });
+  return fetch(`${server.baseUrl}/api/v1${path}`, withSession(session, init));
 }
 
 describe("API routes", () => {
-  it("reports health and readiness", async () => {
-    const health = await api("/health");
+  it("reports health and readiness without a session", async () => {
+    const health = await fetch(`${server.baseUrl}/api/v1/health`);
     expect(health.status).toBe(200);
 
-    const ready = await api("/ready");
+    const ready = await fetch(`${server.baseUrl}/api/v1/ready`);
     expect(ready.status).toBe(200);
     const body = (await ready.json()) as ReadyResponse;
     expect(body).toEqual({
@@ -56,6 +64,13 @@ describe("API routes", () => {
       database: "up",
       timestamp: expect.any(String),
     });
+  });
+
+  it("rejects unauthenticated access to data routes", async () => {
+    const response = await fetch(`${server.baseUrl}/api/v1/projects`);
+    expect(response.status).toBe(401);
+    const body = (await response.json()) as ApiErrorResponse;
+    expect(body.error.code).toBe("unauthenticated");
   });
 
   it("validates project input", async () => {

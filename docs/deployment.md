@@ -44,19 +44,35 @@ Frontend project (`contractripple`) in Vercel:
 
 | Variable | Production value |
 | --- | --- |
-| `NEXT_PUBLIC_API_BASE_URL` | `https://contractripple-api.vercel.app/api/v1` |
+| `NEXT_PUBLIC_API_BASE_URL` | `/api/v1` when `API_PROXY_TARGET` is set; otherwise `https://contractripple-api.vercel.app/api/v1` |
+| `API_PROXY_TARGET` | Optional. API origin without the version prefix, for example `https://contractripple-api.vercel.app`. Enables the same-origin `/api/v1/*` rewrite. |
+
+The same-origin proxy is recommended: the session cookie stays first-party and
+is not subject to third-party-cookie blocking. If you call the API origin
+directly, set `AUTH_COOKIE_SAME_SITE=none` and `AUTH_COOKIE_SECURE=true` on the
+API, and expect that some browsers may still block the cookie.
 
 API project (`contractripple-api`) in Vercel:
 
 | Variable | Notes |
 | --- | --- |
 | `DATABASE_URL` | Managed PostgreSQL connection string. Append `connection_limit=1` for serverless functions unless the database provider supplies a pooler. |
-| `CORS_ORIGINS` | Exact comma-separated origins, for example `https://contractripple.vercel.app`. Wildcards are not supported. |
+| `CORS_ORIGINS` | Exact comma-separated origins, for example `https://contractripple.vercel.app`. Wildcards are not supported. Also used by the CSRF origin guard. |
+| `AUTH_SECRET` | **Required in production**, at least 32 characters. Used for CSRF derivation. Keep it stable across deployments and API instances. |
+| `AUTH_COOKIE_SECURE` | Defaults to `true` in production. Keep it true on HTTPS. |
+| `AUTH_COOKIE_SAME_SITE` | `lax` (default), `strict`, or `none`. `none` requires secure cookies and is only needed for direct cross-site API calls. |
+| `TRUST_PROXY` | Defaults to `true` in production (correct for Vercel). Set `false` if clients connect directly. |
 | `GITHUB_TOKEN` | Optional. Server-side GitHub App or fine-grained PAT with read-only Contents access. Without it, GitHub analysis reports `github_not_configured`. |
 | `GITHUB_API_BASE_URL` | Optional. Defaults to `https://api.github.com`. |
 
-`NODE_ENV` is set to `production` by Vercel. Do not expose `DATABASE_URL` or
-`GITHUB_TOKEN` with a `NEXT_PUBLIC_` prefix.
+Generate `AUTH_SECRET` with a cryptographic random source:
+
+```powershell
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+```
+
+`NODE_ENV` is set to `production` by Vercel. Do not expose `DATABASE_URL`,
+`AUTH_SECRET`, or `GITHUB_TOKEN` with a `NEXT_PUBLIC_` prefix.
 
 Local values live in `.env.local` (frontend) and `apps/api/.env` (API). Neither
 file is committed.
@@ -112,12 +128,19 @@ merge it first.
 ## Database migrations
 
 Migrations are committed in `apps/api/prisma/migrations` and must be applied
-deliberately:
+deliberately, **before** deploying API code that expects the new schema:
 
 ```powershell
 # Point DATABASE_URL in apps/api/.env at the target database first.
 npm run db:deploy
 ```
+
+Phase 7 adds `apps/api/prisma/migrations/20261021120000_add_auth_and_ownership`.
+It creates `User`, `Session`, and `RateLimitBucket`, adds nullable
+`Project.ownerId`, and adds supporting indexes. Applying it is backward
+compatible with the Phase 6 API, but existing projects have no owner and become
+inaccessible once the Phase 7 API is live. Assign owners deliberately or delete
+throwaway data before switching traffic.
 
 Do not run `prisma migrate dev` against production. The managed Prisma Postgres
 database used during development does not provide a shadow database, so new
@@ -143,31 +166,43 @@ migration SQL was generated with `prisma migrate diff` and applied with
 ## Health, CORS, and verification
 
 The API returns `Access-Control-Allow-Origin` only for exact origins listed in
-`CORS_ORIGINS`. It exposes `Content-Disposition` so browser clients can read
-report download filenames. CORS is not authentication and does not stop
-non-browser clients from calling the API.
+`CORS_ORIGINS`, with `Access-Control-Allow-Credentials: true`. It exposes
+`Content-Disposition` so browser clients can read report download filenames.
+CORS is not authentication and does not stop non-browser clients from calling the
+API.
 
-Current live checks used during deployment:
+Post-deployment checks:
 
 ```powershell
 curl.exe -sS https://contractripple-api.vercel.app/api/v1/health
 curl.exe -sS https://contractripple-api.vercel.app/api/v1/ready
-curl.exe -sS https://contractripple-api.vercel.app/api/v1/projects `
-  -H "Origin: https://contractripple.vercel.app"
+curl.exe -sS -o NUL -w "%{http_code}`n" https://contractripple-api.vercel.app/api/v1/projects
+curl.exe -sS -o NUL -w "%{http_code}`n" https://contractripple-api.vercel.app/api/v1/auth/me
 ```
 
-The browser workspace at `/contracts` should show the deployed API endpoint and
-the **Connected** indicator, then load real projects, contracts, paginated
-comparison history, reports, source snapshots, and regression suggestions from
-PostgreSQL. Phase 6 adds no environment variables and no database migration.
+Expected: health `200`, ready `200` with `"database":"up"`, and both
+authenticated probes `401` without a session cookie. Then open
+`https://contractripple.vercel.app/login`, create an account, and confirm the
+workspace loads with only that account's projects. Sign out and confirm
+`/contracts` shows the sign-in prompt.
+
+See `docs/release-checklist.md` for the complete pre- and post-deploy checklist.
 
 ## Security status
 
-Authentication and ownership checks are **not implemented yet**. The deployed
-API is publicly reachable and can read and create data for every project. Use it
-only with test or otherwise non-sensitive data until Phase 7 adds authentication,
-server-side authorization, ownership checks, and rate limiting. CORS is not an
-access-control boundary.
+Phase 7 implements email/password authentication, opaque database-backed
+sessions, CSRF protection, allowlisted credential-aware CORS, security headers,
+ownership checks on every nested resource, and database-backed rate limits. No
+data route is accessible without a session.
+
+Remaining production prerequisites:
+
+- Set `AUTH_SECRET` before deploying the Phase 7 API; the API refuses to start
+  in production without it.
+- Apply the Phase 7 migration before switching traffic.
+- Decide what to do with pre-Phase-7 projects, which have `ownerId = null` and
+  are inaccessible until assigned.
+- Use HTTPS in every environment where the cookie is secure.
 
 ## Known limitations
 
@@ -177,9 +212,18 @@ access-control boundary.
   `main`. The current live API was deployed from the CLI from `open-branch`
   before that branch was merged; it contains only deployment changes plus the
   same API behavior as `main`.
-- The frontend production deployment still corresponds to `main`. Phase 5/6
+- The frontend production deployment still corresponds to `main`. Phase 5–7
   work on `open-branch` becomes live only after the user merges and Vercel
   redeploys. Report exports include the latest source snapshot, so a newly run
   source analysis requires a fresh export.
 - Vercel's 4.5 MB request limit is lower than the application's documented
   10 MiB ZIP limit.
+- Email verification, password reset, account recovery, OAuth, MFA, teams, and
+  audit logging are not implemented.
+- The fixed-window limiter is database-backed but not a distributed token
+  bucket. It bounds abuse per window without smoothing bursts.
+- Cross-site cookies depend on browser policy. Prefer the same-origin proxy
+  (`API_PROXY_TARGET`) for the production frontend.
+- Session cookies last seven days and are not refreshed on every request. An
+  expired session returns `401 unauthenticated`, and the frontend prompts for
+  sign-in again.

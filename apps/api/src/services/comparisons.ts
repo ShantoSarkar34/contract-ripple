@@ -8,17 +8,16 @@ import {
 } from "@contract-ripple/shared";
 import type { Repository } from "../db/types.js";
 import { badRequest, notFound } from "../middleware/http-error.js";
+import { requireProject } from "./authorization.js";
 import { toAnalysisRunDetailDto, toAnalysisRunDto } from "./serialization.js";
 
 export async function createComparison(
   repository: Repository,
+  ownerId: string,
   projectId: string,
   input: CreateComparisonRequest,
 ): Promise<AnalysisRunDetailDto> {
-  const project = await repository.getProject(projectId);
-  if (!project) {
-    throw notFound("project_not_found", "Project not found.");
-  }
+  await requireProject(repository, ownerId, projectId);
 
   const baseline = await repository.getContractVersion(input.baselineVersionId);
   if (!baseline) {
@@ -86,13 +85,11 @@ export async function createComparison(
 
 export async function listComparisons(
   repository: Repository,
+  ownerId: string,
   projectId: string,
   query: ListComparisonsQuery = { limit: DEFAULT_HISTORY_PAGE_SIZE },
 ): Promise<ListAnalysesResponse> {
-  const project = await repository.getProject(projectId);
-  if (!project) {
-    throw notFound("project_not_found", "Project not found.");
-  }
+  await requireProject(repository, ownerId, projectId);
 
   if (query.cursor) {
     const cursorRun = await repository.getAnalysisRunScope(query.cursor);
@@ -118,11 +115,18 @@ export async function listComparisons(
 
 export async function getComparison(
   repository: Repository,
+  ownerId: string,
   comparisonId: string,
 ): Promise<AnalysisRunDetailDto> {
   const run = await repository.getAnalysisRun(comparisonId);
   if (!run) {
     throw notFound("comparison_not_found", "Comparison not found.");
   }
+
+  const project = await repository.getProject(run.projectId);
+  if (!project || project.ownerId !== ownerId) {
+    throw notFound("comparison_not_found", "Comparison not found.");
+  }
+
   return toAnalysisRunDetailDto(run);
 }

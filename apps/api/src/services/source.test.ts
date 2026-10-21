@@ -1,6 +1,7 @@
 import { strToU8, zipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import { MemoryRepository } from "../db/memory-repository.js";
+import { TEST_OWNER_ID } from "../testing/auth.js";
 import { baselinePetJson, candidatePetJson } from "../testing/fixtures.js";
 import type { GitHubFetch } from "./github.js";
 import { createComparison } from "./comparisons.js";
@@ -28,18 +29,18 @@ export async function unrelated() {
 }
 `;
 
-async function seedComparison(repository: MemoryRepository) {
-  const project = await createProject(repository, { name: "Pets" });
-  const contract = await createContract(repository, project.id, { name: "pets-api" });
-  const baseline = await createContractVersion(repository, contract.id, {
+async function seedComparison(repository: MemoryRepository, ownerId = TEST_OWNER_ID) {
+  const project = await createProject(repository, ownerId, { name: "Pets" });
+  const contract = await createContract(repository, ownerId, project.id, { name: "pets-api" });
+  const baseline = await createContractVersion(repository, ownerId, contract.id, {
     content: baselinePetJson,
     label: "v1",
   });
-  const candidate = await createContractVersion(repository, contract.id, {
+  const candidate = await createContractVersion(repository, ownerId, contract.id, {
     content: candidatePetJson,
     label: "v2",
   });
-  const comparison = await createComparison(repository, project.id, {
+  const comparison = await createComparison(repository, ownerId, project.id, {
     baselineVersionId: baseline.id,
     candidateVersionId: candidate.id,
   });
@@ -83,9 +84,13 @@ describe("source analysis services", () => {
     const repository = new MemoryRepository();
     const { project, comparison } = await seedComparison(repository);
 
-    const snapshot = await analyzeZipSource(repository, project.id, buildSourceZip(), {
-      analysisRunId: comparison.id,
-    });
+    const snapshot = await analyzeZipSource(
+      repository,
+      TEST_OWNER_ID,
+      project.id,
+      buildSourceZip(),
+      { analysisRunId: comparison.id },
+    );
 
     expect(snapshot).toMatchObject({
       projectId: project.id,
@@ -110,7 +115,7 @@ describe("source analysis services", () => {
     });
     expect(snapshot.limitations.join(" ")).toContain("Static analysis only detects");
 
-    const stored = await getSourceSnapshot(repository, snapshot.id);
+    const stored = await getSourceSnapshot(repository, TEST_OWNER_ID, snapshot.id);
     expect(stored.impacts.map((impact) => impact.id)).toEqual(
       snapshot.impacts.map((impact) => impact.id),
     );
@@ -120,7 +125,7 @@ describe("source analysis services", () => {
     const repository = new MemoryRepository();
     const { project, comparison } = await seedComparison(repository);
 
-    const snapshot = await analyzeZipSource(repository, project.id, buildSourceZip(), {});
+    const snapshot = await analyzeZipSource(repository, TEST_OWNER_ID, project.id, buildSourceZip(), {});
 
     expect(snapshot.analysisRunId).toBe(comparison.id);
   });
@@ -129,14 +134,14 @@ describe("source analysis services", () => {
     const repository = new MemoryRepository();
     const { project, comparison } = await seedComparison(repository);
 
-    await analyzeZipSource(repository, project.id, buildSourceZip(), {
+    await analyzeZipSource(repository, TEST_OWNER_ID, project.id, buildSourceZip(), {
       analysisRunId: comparison.id,
     });
-    await analyzeZipSource(repository, project.id, buildSourceZip(), {
+    await analyzeZipSource(repository, TEST_OWNER_ID, project.id, buildSourceZip(), {
       analysisRunId: comparison.id,
     });
 
-    const { snapshots } = await listSourceSnapshots(repository, project.id);
+    const { snapshots } = await listSourceSnapshots(repository, TEST_OWNER_ID, project.id);
 
     expect(snapshots).toHaveLength(2);
     expect(snapshots[0]?.impactCount).toBe(2);
@@ -145,20 +150,20 @@ describe("source analysis services", () => {
 
   it("requires a comparison before source analysis", async () => {
     const repository = new MemoryRepository();
-    const project = await createProject(repository, { name: "No comparisons" });
+    const project = await createProject(repository, TEST_OWNER_ID, { name: "No comparisons" });
 
     await expect(
-      analyzeZipSource(repository, project.id, buildSourceZip(), {}),
+      analyzeZipSource(repository, TEST_OWNER_ID, project.id, buildSourceZip(), {}),
     ).rejects.toMatchObject({ status: 400, code: "no_comparison" });
   });
 
   it("rejects a comparison from another project", async () => {
     const repository = new MemoryRepository();
     const first = await seedComparison(repository);
-    const otherProject = await createProject(repository, { name: "Other" });
+    const otherProject = await createProject(repository, TEST_OWNER_ID, { name: "Other" });
 
     await expect(
-      analyzeZipSource(repository, otherProject.id, buildSourceZip(), {
+      analyzeZipSource(repository, TEST_OWNER_ID, otherProject.id, buildSourceZip(), {
         analysisRunId: first.comparison.id,
       }),
     ).rejects.toMatchObject({ status: 400, code: "comparison_project_mismatch" });
@@ -168,7 +173,22 @@ describe("source analysis services", () => {
     const repository = new MemoryRepository();
 
     await expect(
-      analyzeZipSource(repository, "missing", buildSourceZip(), {}),
+      analyzeZipSource(repository, TEST_OWNER_ID, "missing", buildSourceZip(), {}),
+    ).rejects.toMatchObject({ status: 404, code: "project_not_found" });
+  });
+
+  it("does not analyze source or read snapshots for another owner", async () => {
+    const repository = new MemoryRepository();
+    const { project, comparison } = await seedComparison(repository, "someone-else");
+
+    await expect(
+      analyzeZipSource(repository, TEST_OWNER_ID, project.id, buildSourceZip(), {
+        analysisRunId: comparison.id,
+      }),
+    ).rejects.toMatchObject({ status: 404, code: "project_not_found" });
+
+    await expect(
+      listSourceSnapshots(repository, TEST_OWNER_ID, project.id),
     ).rejects.toMatchObject({ status: 404, code: "project_not_found" });
   });
 
@@ -178,10 +198,12 @@ describe("source analysis services", () => {
     const unsafe = zipSync({ "../evil.ts": strToU8(`fetch("/pets");`) });
 
     await expect(
-      analyzeZipSource(repository, project.id, unsafe, { analysisRunId: comparison.id }),
+      analyzeZipSource(repository, TEST_OWNER_ID, project.id, unsafe, {
+        analysisRunId: comparison.id,
+      }),
     ).rejects.toMatchObject({ status: 400, code: "unsafe_path" });
 
-    const { snapshots } = await listSourceSnapshots(repository, project.id);
+    const { snapshots } = await listSourceSnapshots(repository, TEST_OWNER_ID, project.id);
     expect(snapshots).toHaveLength(0);
   });
 
@@ -192,6 +214,7 @@ describe("source analysis services", () => {
     await expect(
       analyzeZipSource(
         repository,
+        TEST_OWNER_ID,
         project.id,
         buildSourceZip({ "README.md": "# no source" }),
         { analysisRunId: comparison.id },
@@ -205,6 +228,7 @@ describe("source analysis services", () => {
 
     const snapshot = await analyzeGitHubSource(
       repository,
+      TEST_OWNER_ID,
       project.id,
       { repository: "octo/pets", analysisRunId: comparison.id },
       {
@@ -229,6 +253,7 @@ describe("source analysis services", () => {
     await expect(
       analyzeGitHubSource(
         repository,
+        TEST_OWNER_ID,
         project.id,
         { repository: "octo/pets", analysisRunId: comparison.id },
         { githubToken: "" },

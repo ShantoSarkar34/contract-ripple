@@ -1,6 +1,8 @@
 import type {
   AnalysisRunDetailDto,
   AnalysisRunDto,
+  AuthSessionResponse,
+  AuthUserDto,
   ContractDetailDto,
   ContractDto,
   ContractVersionDetailDto,
@@ -16,8 +18,10 @@ import type {
   ListProjectsResponse,
   ListSourceSnapshotsResponse,
   ListVersionsResponse,
+  LoginRequest,
   ProjectDto,
   ReadyResponse,
+  RegisterRequest,
   ReportFormat,
   SourceSnapshotDetailDto,
   SourceSnapshotDto,
@@ -33,6 +37,27 @@ export const API_BASE_URL = (
 ).replace(/\/+$/, "");
 
 const ERROR_CODES_WITH_DETAILS = new Set(["validation_error"]);
+
+/**
+ * CSRF token returned by the auth endpoints. It is kept in memory only and
+ * attached to unsafe requests. The session itself is an HttpOnly cookie that
+ * JavaScript never reads.
+ */
+let csrfToken: string | null = null;
+
+export function setCsrfToken(token: string | null): void {
+  csrfToken = token;
+}
+
+type UnauthorizedHandler = () => void;
+let unauthorizedHandler: UnauthorizedHandler | null = null;
+
+/** Lets the auth provider react to an expired or revoked session. */
+export function setUnauthorizedHandler(handler: UnauthorizedHandler | null): void {
+  unauthorizedHandler = handler;
+}
+
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 /** Error thrown for any non-2xx API response or network failure. */
 export class ApiRequestError extends Error {
@@ -93,14 +118,19 @@ export function describeErrorDetails(error: ApiRequestError): string[] {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const isFormData = typeof FormData !== "undefined" && init?.body instanceof FormData;
+  const method = (init?.method ?? "GET").toUpperCase();
   const headers = new Headers(init?.headers);
   if (!isFormData && !headers.has("content-type")) {
     headers.set("content-type", "application/json");
+  }
+  if (!SAFE_METHODS.has(method) && csrfToken) {
+    headers.set("x-csrf-token", csrfToken);
   }
 
   let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
+      credentials: "include",
       ...init,
       headers,
     });
@@ -110,6 +140,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       "network_error",
       `Could not reach the API at ${API_BASE_URL}. Confirm the backend is running.`,
     );
+  }
+
+  if (response.status === 401 && !path.startsWith("/auth/login") && !path.startsWith("/auth/register")) {
+    csrfToken = null;
+    unauthorizedHandler?.();
   }
 
   const text = await response.text();
@@ -137,13 +172,18 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 async function requestBlob(path: string): Promise<Blob> {
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}${path}`);
+    response = await fetch(`${API_BASE_URL}${path}`, { credentials: "include" });
   } catch {
     throw new ApiRequestError(
       0,
       "network_error",
       `Could not reach the API at ${API_BASE_URL}. Confirm the backend is running.`,
     );
+  }
+
+  if (response.status === 401) {
+    csrfToken = null;
+    unauthorizedHandler?.();
   }
 
   if (!response.ok) {
@@ -172,6 +212,28 @@ function id(value: string): string {
 }
 
 export const api = {
+  getSession(): Promise<AuthSessionResponse> {
+    return request<AuthSessionResponse>("/auth/me");
+  },
+
+  register(input: RegisterRequest): Promise<AuthSessionResponse> {
+    return request<AuthSessionResponse>("/auth/register", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  },
+
+  login(input: LoginRequest): Promise<AuthSessionResponse> {
+    return request<AuthSessionResponse>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  },
+
+  logout(): Promise<void> {
+    return request<void>("/auth/logout", { method: "POST" });
+  },
+
   getReady(): Promise<ReadyResponse> {
     return request<ReadyResponse>("/ready");
   },
@@ -314,6 +376,8 @@ export const api = {
 export type {
   AnalysisRunDetailDto,
   AnalysisRunDto,
+  AuthSessionResponse,
+  AuthUserDto,
   ContractDto,
   ContractVersionDto,
   ProjectDto,

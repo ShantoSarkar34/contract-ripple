@@ -10,29 +10,48 @@ import { MemoryRepository } from "../db/memory-repository.js";
 import { createComparison } from "../services/comparisons.js";
 import { createContract, createContractVersion } from "../services/contracts.js";
 import { createProject } from "../services/projects.js";
+import {
+  registerTestUser,
+  TEST_AUTH_SECRET,
+  withSession,
+  type TestSession,
+} from "../testing/auth.js";
 import { baselinePetJson, candidatePetJson } from "../testing/fixtures.js";
 import { startTestServer, type TestServer } from "../testing/http.js";
 
 let server: TestServer;
+let session: TestSession;
 let projectId: string;
 let comparisonIds: string[] = [];
 let latestComparisonId: string;
 
 beforeAll(async () => {
   const repository = new MemoryRepository();
-  const project = await createProject(repository, { name: "Pets" });
-  const contract = await createContract(repository, project.id, { name: "pets-api" });
-  const baseline = await createContractVersion(repository, contract.id, {
+  server = await startTestServer(
+    createApp({
+      corsOrigins: ["http://localhost:3000"],
+      repository,
+      authSecret: TEST_AUTH_SECRET,
+      nodeEnv: "test",
+      trustProxy: false,
+    }),
+  );
+  session = await registerTestUser(server.baseUrl, "reports-owner@example.test");
+  const ownerId = session.user.id;
+
+  const project = await createProject(repository, ownerId, { name: "Pets" });
+  const contract = await createContract(repository, ownerId, project.id, { name: "pets-api" });
+  const baseline = await createContractVersion(repository, ownerId, contract.id, {
     content: baselinePetJson,
     label: "v1",
   });
-  const candidate = await createContractVersion(repository, contract.id, {
+  const candidate = await createContractVersion(repository, ownerId, contract.id, {
     content: candidatePetJson,
     label: "v2",
   });
 
   for (let index = 0; index < 3; index += 1) {
-    const comparison = await createComparison(repository, project.id, {
+    const comparison = await createComparison(repository, ownerId, project.id, {
       baselineVersionId: baseline.id,
       candidateVersionId: candidate.id,
       label: `run ${index + 1}`,
@@ -69,18 +88,14 @@ beforeAll(async () => {
       },
     ],
   });
-
-  server = await startTestServer(
-    createApp({ corsOrigins: ["http://localhost:3000"], repository }),
-  );
 });
 
 afterAll(async () => {
   await server.close();
 });
 
-function api(path: string): Promise<Response> {
-  return fetch(`${server.baseUrl}/api/v1${path}`);
+function api(path: string, init?: RequestInit): Promise<Response> {
+  return fetch(`${server.baseUrl}/api/v1${path}`, withSession(session, init));
 }
 
 describe("saved history and report routes", () => {

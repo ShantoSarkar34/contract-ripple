@@ -8,6 +8,8 @@ import {
   createGithubSourceRequestSchema,
   createProjectRequestSchema,
   githubSourceFieldsSchema,
+  loginRequestSchema,
+  registerRequestSchema,
   MAX_CONTRACT_BYTES,
   MAX_HISTORY_PAGE_SIZE,
   MAX_SOURCE_ARCHIVE_BYTES,
@@ -17,6 +19,48 @@ import {
   utf8ByteLength,
   zipSourceFieldsSchema,
 } from "./api";
+
+describe("auth request schemas", () => {
+  it("normalizes email addresses and accepts a long password", () => {
+    const result = registerRequestSchema.safeParse({
+      email: "  User@Example.COM ",
+      password: "a".repeat(12),
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.email).toBe("user@example.com");
+    }
+  });
+
+  it("rejects short passwords and invalid email addresses", () => {
+    expect(
+      registerRequestSchema.safeParse({ email: "user@example.com", password: "short" }).success,
+    ).toBe(false);
+    expect(
+      registerRequestSchema.safeParse({ email: "not-an-email", password: "a".repeat(12) })
+        .success,
+    ).toBe(false);
+    expect(loginRequestSchema.safeParse({ email: "user@example.com", password: "" }).success).toBe(
+      false,
+    );
+  });
+
+  it("normalizes the login email without trimming the password", () => {
+    const result = loginRequestSchema.safeParse({
+      email: " USER@Example.COM ",
+      password: " password with spaces ",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toEqual({
+        email: "user@example.com",
+        password: " password with spaces ",
+      });
+    }
+  });
+});
 
 describe("createProjectRequestSchema", () => {
   it("accepts a name and optional description", () => {

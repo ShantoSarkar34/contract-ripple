@@ -16,8 +16,41 @@ export type ContractSummaryRecord = {
   warnings: string[];
 };
 
+export type UserRecord = {
+  id: string;
+  email: string;
+  passwordHash: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type SessionRecord = {
+  id: string;
+  userId: string;
+  tokenHash: string;
+  expiresAt: Date;
+  createdAt: Date;
+};
+
+export type SessionWithUserRecord = SessionRecord & { user: UserRecord };
+
+export type ConsumeRateLimitInput = {
+  key: string;
+  limit: number;
+  windowMs: number;
+  now?: Date;
+};
+
+export type RateLimitResult = {
+  allowed: boolean;
+  remaining: number;
+  retryAfterSeconds: number;
+  resetAt: Date;
+};
+
 export type ProjectRecord = {
   id: string;
+  ownerId: string | null;
   name: string;
   description: string | null;
   createdAt: Date;
@@ -119,7 +152,19 @@ export type AnalysisRunScopeRecord = {
   projectId: string;
 };
 
+export type CreateUserInput = {
+  email: string;
+  passwordHash: string;
+};
+
+export type CreateSessionInput = {
+  userId: string;
+  tokenHash: string;
+  expiresAt: Date;
+};
+
 export type CreateProjectInput = {
+  ownerId: string;
   name: string;
   description?: string;
 };
@@ -272,8 +317,18 @@ export type CreateSourceSnapshotInput = {
 export interface Repository {
   ping(): Promise<void>;
 
+  createUser(input: CreateUserInput): Promise<UserRecord>;
+  getUserByEmail(email: string): Promise<UserRecord | null>;
+  getUserById(id: string): Promise<UserRecord | null>;
+
+  createSession(input: CreateSessionInput): Promise<SessionRecord>;
+  getSessionByTokenHash(tokenHash: string): Promise<SessionWithUserRecord | null>;
+  deleteSessionByTokenHash(tokenHash: string): Promise<void>;
+
+  consumeRateLimit(input: ConsumeRateLimitInput): Promise<RateLimitResult>;
+
   createProject(input: CreateProjectInput): Promise<ProjectRecord>;
-  listProjects(): Promise<ProjectRecordWithCount[]>;
+  listProjects(ownerId: string): Promise<ProjectRecordWithCount[]>;
   getProject(id: string): Promise<ProjectRecordWithCount | null>;
   updateProject(id: string, input: UpdateProjectInput): Promise<ProjectRecord | null>;
 

@@ -7,6 +7,7 @@ import {
 } from "@contract-ripple/shared";
 import type { Repository } from "../db/types.js";
 import { asyncHandler } from "../middleware/async-handler.js";
+import { requireAuth } from "../middleware/auth.js";
 import { HttpError, badRequest } from "../middleware/http-error.js";
 import { parseWithSchema } from "../middleware/validate.js";
 import {
@@ -17,6 +18,11 @@ import {
   listSourceSnapshots,
   type SourceServiceOptions,
 } from "../services/source.js";
+import {
+  enforceRateLimit,
+  rateLimitKey,
+  type RateLimitConfig,
+} from "../services/rate-limit.js";
 import { MAX_ARCHIVE_BYTES } from "../services/zip.js";
 import { requiredParam } from "./params.js";
 
@@ -57,6 +63,7 @@ function uploadArchive(request: Request, response: Response, next: NextFunction)
 export function createSourceRouter(
   repository: Repository,
   options: SourceServiceOptions,
+  rateLimits: RateLimitConfig,
 ): Router {
   const router = Router();
 
@@ -68,12 +75,19 @@ export function createSourceRouter(
     "/projects/:projectId/source/zip",
     uploadArchive,
     asyncHandler(async (request, response) => {
+      const auth = requireAuth(request);
       if (!request.file) {
         throw badRequest("archive_required", "Attach a ZIP archive in the `archive` field.");
       }
       const fields = parseWithSchema(zipSourceFieldsSchema, request.body);
+      await enforceRateLimit(
+        repository,
+        rateLimitKey("source:analyze:user", auth.user.id),
+        rateLimits.sourceAnalysisPerUser,
+      );
       const snapshot = await analyzeZipSource(
         repository,
+        auth.user.id,
         requiredParam(request, "projectId"),
         request.file.buffer,
         fields,
@@ -85,9 +99,16 @@ export function createSourceRouter(
   router.post(
     "/projects/:projectId/source/github",
     asyncHandler(async (request, response) => {
+      const auth = requireAuth(request);
       const input = parseWithSchema(createGithubSourceRequestSchema, request.body);
+      await enforceRateLimit(
+        repository,
+        rateLimitKey("source:analyze:user", auth.user.id),
+        rateLimits.sourceAnalysisPerUser,
+      );
       const snapshot = await analyzeGitHubSource(
         repository,
+        auth.user.id,
         requiredParam(request, "projectId"),
         input,
         options,
@@ -99,8 +120,10 @@ export function createSourceRouter(
   router.get(
     "/projects/:projectId/source",
     asyncHandler(async (request, response) => {
+      const auth = requireAuth(request);
       const body: ListSourceSnapshotsResponse = await listSourceSnapshots(
         repository,
+        auth.user.id,
         requiredParam(request, "projectId"),
       );
       response.status(200).json(body);
@@ -110,8 +133,10 @@ export function createSourceRouter(
   router.get(
     "/source/:snapshotId",
     asyncHandler(async (request, response) => {
+      const auth = requireAuth(request);
       const snapshot = await getSourceSnapshot(
         repository,
+        auth.user.id,
         requiredParam(request, "snapshotId"),
       );
       response.status(200).json(snapshot);

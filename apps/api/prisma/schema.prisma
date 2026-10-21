@@ -1,7 +1,8 @@
 // ContractRipple database schema.
 //
-// Domain models for persisted projects, contract versions, comparison runs,
-// and findings. Ownership fields are added with authentication in Phase 7.
+// Domain models for persisted users, sessions, projects, contract versions,
+// comparison runs, findings, and source analysis. Authentication is backed by
+// opaque server-side sessions; only hashes of session tokens are stored.
 //
 // Never put real credentials in this file; the connection string comes from the
 // DATABASE_URL environment variable.
@@ -20,8 +21,43 @@ enum AnalysisStatus {
   failed
 }
 
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  projects     Project[]
+  sessions     Session[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// Fixed-window counters used by the API rate limiter. Keys are opaque hashes,
+/// not raw email addresses or IP addresses.
+model RateLimitBucket {
+  key       String   @id
+  count     Int
+  resetAt   DateTime
+  updatedAt DateTime @updatedAt
+
+  @@index([resetAt])
+}
+
 model Project {
   id              String           @id @default(cuid())
+  ownerId         String?
+  owner           User?            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   name            String
   description     String?
   createdAt       DateTime         @default(now())
@@ -29,6 +65,8 @@ model Project {
   contracts       Contract[]
   analysisRuns    AnalysisRun[]
   sourceSnapshots SourceSnapshot[]
+
+  @@index([ownerId])
 }
 
 model Contract {

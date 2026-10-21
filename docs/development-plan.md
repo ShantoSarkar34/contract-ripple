@@ -42,8 +42,8 @@ See `docs/architecture.md` for boundaries and data flow.
 | **3** | Backend + database | Prisma models, migrations, `/api/v1`, persistence, real frontend integration | **Done** |
 | **4** | Source analysis | AST matching, secure ZIP pipeline, real GitHub integration, evidence | **Done** |
 | **5** | Impact graph + UI | evidence-backed graph, filterable findings, accessible views | **Done** |
-| **6** | Reports + history | saved history, JSON/readable exports, regression suggestions | **In review** |
-| **7** | Auth + security + deploy | sessions, authorization, IDOR tests, hardening, release checklist | Planned |
+| **6** | Reports + history | saved history, JSON/readable exports, regression suggestions | **Done** |
+| **7** | Auth + security + deploy | sessions, authorization, IDOR tests, hardening, release checklist | **In review** |
 
 Each phase ends with a completion report and stops. No phase starts automatically.
 
@@ -277,6 +277,72 @@ See `docs/source-analysis.md` and `docs/api.md` for details.
 - Replacing the landing page's clearly labeled demo content with fabricated
   analysis results.
 
+## Phase 7 decisions
+
+- **Email/password authentication with opaque sessions.** Registration and login
+  accept an email and a password (12–200 characters). Passwords are hashed with
+  Node's `scrypt` (N=32768, r=8, p=1), a random 16-byte salt, and a stored
+  parameterized hash string. The raw password is never stored or logged.
+- **Session tokens never reach client JavaScript.** A random 32-byte token is
+  set in an `HttpOnly` cookie (`cr_session`, `Path=/api/v1`), and only its
+  SHA-256 hash is stored in `Session.tokenHash`. Sessions expire after seven
+  days; expired sessions are deleted when presented.
+- **CSRF uses a derived, session-bound token.** The token is
+  `base64url(HMAC-SHA256(AUTH_SECRET, rawSessionToken))`, returned by
+  `/auth/register`, `/auth/login`, and `/auth/me`. Unsafe requests must send it
+  in `x-csrf-token`. Nothing extra is stored in the database.
+- **SameSite plus an origin guard.** The cookie defaults to `SameSite=Lax`.
+  `AUTH_COOKIE_SAME_SITE` can set `strict` or `none`; `none` requires secure
+  cookies. Mutating requests also reject a present `Origin` header that is not
+  in `CORS_ORIGINS`.
+- **Server-side ownership on every nested resource.** `Project.ownerId`
+  references `User`. Every project, contract, version, comparison, report,
+  source snapshot, and source-analysis mutation resolves the owning project and
+  compares it to the session user. Unauthorized or unknown resources return
+  `404` with the resource's normal not-found code instead of `403`, so ids are
+  not confirmed.
+- **Nullable ownership for existing data.** `Project.ownerId` is nullable so the
+  migration does not fail on existing rows. Legacy projects remain stored but
+  are inaccessible until an operator assigns an owner; new projects always
+  receive the authenticated user's id.
+- **Database-backed fixed-window rate limits.** `RateLimitBucket` stores a
+  hashed bucket key, a window start, and a count. Policies cover registration
+  and login per IP, login per email, project creation, comparison creation, and
+  source analysis per user. Keys are SHA-256 digests of a scope plus the raw
+  identifier, so IPs and emails are not stored in the limiter table. Limiter
+  failures return `429 rate_limited` with `Retry-After`.
+- **Security headers and error discipline.** Helmet sets standard hardening
+  headers, CORS is credential-aware and allowlisted, auth endpoints use a
+  small JSON body limit, and auth errors keep stable codes:
+  `unauthenticated`, `invalid_credentials`, `email_taken`, `invalid_csrf`,
+  `invalid_origin`, and `rate_limited`. Passwords, tokens, hashes, and raw
+  authorization headers are never returned.
+- **Frontend auth flow.** `AuthProvider` loads `/auth/me`, keeps the CSRF token
+  in memory, reacts to `401` by clearing the session, and gates the workspace.
+  `/login` supports sign-in and account creation. The navbar shows the session
+  email and a sign-out action.
+- **Same-origin proxy option.** `API_PROXY_TARGET` enables a Next.js rewrite
+  from `/api/v1/*` to the API origin. With
+  `NEXT_PUBLIC_API_BASE_URL=/api/v1`, the session cookie stays first-party,
+  avoiding third-party-cookie restrictions. Direct cross-site API calls remain
+  possible when `SameSite=None` and secure cookies are configured, but are a
+  documented deployment limitation.
+- **No production deployment in this phase.** The migration and environment
+  changes are prepared and documented; applying them to the live database and
+  redeploying require explicit approval. See `docs/release-checklist.md`.
+
+## Non-goals for Phase 7
+
+- Email verification, password reset, account deletion, OAuth/social login,
+  MFA, teams, roles, invitations, or an audit log.
+- Per-user GitHub OAuth/App installation tokens; the server-side
+  `GITHUB_TOKEN` model is unchanged.
+- A distributed rate limiter (Redis) or per-user quotas beyond the documented
+  fixed policies.
+- Stored report artifacts, scheduled reports, or share links.
+- Repo restructuring, Vercel root-directory changes, or production deployment
+  without separate approval.
+
 ## Non-goals for Phase 3
 
 - Authentication/authorization and per-user ownership.
@@ -335,8 +401,8 @@ See `docs/source-analysis.md` and `docs/api.md` for details.
 - **Report scope:** exports are generated on demand from persisted records and
   include only the latest source snapshot per comparison. Do not present older
   snapshots as included, and do not turn review prompts into executable tests or
-  invented expected status codes. The API remains unauthenticated until Phase 7,
-  so reports must not contain real user data yet.
+  invented expected status codes. Reports are scoped to the authenticated
+  owner by the same project check as the comparison routes.
 - **Markdown escaping:** finding summaries, paths, and source snippets are
   untrusted. Keep table/inline escaping and dynamic code-fence sizing when adding
   report sections.
@@ -346,3 +412,26 @@ See `docs/source-analysis.md` and `docs/api.md` for details.
   token if it is ever exposed; it must never be logged or returned to clients.
 - **YAML resource exhaustion:** alias bombs and circular aliases are bounded or
   rejected. Keep these limits when adding alternate parsers.
+- **Session and CSRF secret:** `AUTH_SECRET` must be at least 32 characters in
+  production and stable across API instances. Changing it invalidates derived
+  CSRF tokens, so clients receive a `403 invalid_csrf` until `/auth/me` is
+  reloaded. Rotate it only with an intentional re-authentication window.
+- **Cross-site cookies:** direct frontend-to-API calls need
+  `AUTH_COOKIE_SAME_SITE=none` and secure cookies, and browsers may still block
+  third-party cookies. Prefer the `API_PROXY_TARGET` same-origin rewrite.
+  `TRUST_PROXY` must match the deployment topology or IP rate limits can group
+  all clients together.
+- **Legacy ownership:** projects created before Phase 7 have no owner and are
+  inaccessible through the API. Assign them deliberately before enabling
+  production traffic; do not make ownership checks optional to preserve access.
+- **Rate limiter scope:** the fixed-window limiter is database-backed and correct
+  enough for a single-region deployment, but it is not a distributed token
+  bucket and does not smooth bursts. A 429 is expected behavior under attack
+  load; clients should honor `Retry-After`.
+- **Auth transport:** this phase has no email verification, password reset, or
+  account recovery. Losing a password means the account is unrecoverable until a
+  later phase adds recovery. HTTPS and secure cookies are mandatory in
+  production.
+- **IDOR coverage:** tests cover cross-user access for every resource family.
+  When adding a new nested route, resolve its owning project explicitly; do not
+  rely on the route prefix or client-side filtering for authorization.

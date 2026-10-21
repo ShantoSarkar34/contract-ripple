@@ -15,6 +15,7 @@ import type {
 } from "@contract-ripple/shared";
 import type { AnalysisRunDetailRecord, Repository } from "../db/types.js";
 import { HttpError, badRequest, notFound } from "../middleware/http-error.js";
+import { requireProject } from "./authorization.js";
 import {
   fetchGitHubSource,
   GitHubError,
@@ -211,14 +212,12 @@ async function persistSourceAnalysis(
 
 export async function analyzeZipSource(
   repository: Repository,
+  ownerId: string,
   projectId: string,
   archive: Uint8Array,
   fields: ZipSourceFields,
 ): Promise<SourceSnapshotDetailDto> {
-  const project = await repository.getProject(projectId);
-  if (!project) {
-    throw notFound("project_not_found", "Project not found.");
-  }
+  await requireProject(repository, ownerId, projectId);
 
   if (archive.byteLength === 0) {
     throw badRequest("empty_archive", "The uploaded ZIP archive is empty.");
@@ -260,6 +259,7 @@ export async function analyzeZipSource(
 
 export async function analyzeGitHubSource(
   repository: Repository,
+  ownerId: string,
   projectId: string,
   input: GitHubSourceFields,
   options: SourceServiceOptions,
@@ -272,10 +272,7 @@ export async function analyzeGitHubSource(
     );
   }
 
-  const project = await repository.getProject(projectId);
-  if (!project) {
-    throw notFound("project_not_found", "Project not found.");
-  }
+  await requireProject(repository, ownerId, projectId);
 
   let source: GitHubSourceResult;
   try {
@@ -314,12 +311,10 @@ export async function analyzeGitHubSource(
 
 export async function listSourceSnapshots(
   repository: Repository,
+  ownerId: string,
   projectId: string,
 ): Promise<ListSourceSnapshotsResponse> {
-  const project = await repository.getProject(projectId);
-  if (!project) {
-    throw notFound("project_not_found", "Project not found.");
-  }
+  await requireProject(repository, ownerId, projectId);
 
   const snapshots = await repository.listSourceSnapshotsByProject(projectId);
   return { snapshots: snapshots.map(toSourceSnapshotDto) };
@@ -327,12 +322,19 @@ export async function listSourceSnapshots(
 
 export async function getSourceSnapshot(
   repository: Repository,
+  ownerId: string,
   snapshotId: string,
 ): Promise<SourceSnapshotDetailDto> {
   const snapshot = await repository.getSourceSnapshot(snapshotId);
   if (!snapshot) {
     throw notFound("source_snapshot_not_found", "Source analysis snapshot not found.");
   }
+
+  const project = await repository.getProject(snapshot.projectId);
+  if (!project || project.ownerId !== ownerId) {
+    throw notFound("source_snapshot_not_found", "Source analysis snapshot not found.");
+  }
+
   return toSourceSnapshotDetailDto(snapshot);
 }
 

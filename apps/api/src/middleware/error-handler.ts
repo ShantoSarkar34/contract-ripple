@@ -33,6 +33,11 @@ export function errorHandler(
   _next: NextFunction,
 ): void {
   if (error instanceof HttpError) {
+    if (error.headers) {
+      for (const [name, value] of Object.entries(error.headers)) {
+        response.setHeader(name, value);
+      }
+    }
     const body: ApiErrorResponse = {
       error: {
         code: error.code,
