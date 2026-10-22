@@ -47,7 +47,50 @@ function ContractsIcon() {
   );
 }
 
-const NAV_ITEMS = [
+function ProjectsIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-4 w-4 shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <path d="M3 11h18" />
+    </svg>
+  );
+}
+
+function HistoryIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-4 w-4 shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M3 12a9 9 0 1 0 3-6.7" />
+      <path d="M3 4v5h5" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  );
+}
+
+const NAV_ITEMS: Array<{
+  href: string;
+  label: string;
+  description: string;
+  icon: React.ReactNode;
+  aliases?: readonly string[];
+}> = [
   {
     href: "/dashboard",
     label: "Dashboard",
@@ -55,15 +98,32 @@ const NAV_ITEMS = [
     icon: <DashboardIcon />,
   },
   {
+    href: "/projects",
+    label: "Projects",
+    description: "Group contracts and their saved analyses",
+    icon: <ProjectsIcon />,
+  },
+  {
     href: "/contracts",
     label: "Contracts",
     description: "Compare versions, review findings, analyze impact",
     icon: <ContractsIcon />,
   },
+  {
+    href: "/history",
+    label: "History",
+    description: "Every saved analysis across projects",
+    icon: <HistoryIcon />,
+    aliases: ["/analyses"],
+  },
 ];
 
-function isActive(pathname: string, href: string): boolean {
-  return pathname === href || pathname.startsWith(`${href}/`);
+function isActive(pathname: string, href: string, aliases: readonly string[] = []): boolean {
+  return (
+    pathname === href ||
+    pathname.startsWith(`${href}/`) ||
+    aliases.some((alias) => pathname === alias || pathname.startsWith(`${alias}/`))
+  );
 }
 
 function initialsFor(email: string): string {
@@ -114,7 +174,7 @@ function SidebarBody({
         </p>
         <ul className="mt-2 space-y-1">
           {NAV_ITEMS.map((item) => {
-            const active = isActive(pathname, item.href);
+            const active = isActive(pathname, item.href, item.aliases);
             return (
               <li key={item.href}>
                 <Link
@@ -124,7 +184,7 @@ function SidebarBody({
                   className={cn(
                     "flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                     active
-                      ? "bg-primary/15 text-white"
+                      ? "bg-primary/15 text-sidebar-foreground"
                       : "text-sidebar-muted hover:bg-sidebar-active hover:text-sidebar-foreground",
                   )}
                 >
@@ -214,7 +274,7 @@ export default function WorkspaceShell({ children }: { children: React.ReactNode
   const { user } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const activeItem = NAV_ITEMS.find((item) => isActive(pathname, item.href));
+  const activeItem = NAV_ITEMS.find((item) => isActive(pathname, item.href, item.aliases));
 
   return (
     <div className="min-h-screen bg-surface-muted">

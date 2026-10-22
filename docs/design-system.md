@@ -1,7 +1,8 @@
 # ContractRipple — design system
 
 Stage 2 of the product redesign introduced a shared token layer, UI primitives, and three route-group
-shells. This document is the reference for the remaining stages so new views stay consistent.
+shells. Stage 3 added the authenticated dashboard; Stage 4 added the project, contract, analysis, and
+history views. This document is the reference for the remaining stages so new views stay consistent.
 
 ## Tokens
 
@@ -65,13 +66,24 @@ scheme.
 
 ## Workspace navigation
 
-The workspace shell exposes only routes that exist: Dashboard (`/dashboard`) and Contracts
-(`/contracts`). Add an entry to `NAV_ITEMS` in `workspace-shell.tsx` in the same change that adds the
-route, so the sidebar never shows a dead link. The top-bar breadcrumb derives from the active item.
-Inside the workspace the logo returns to `/dashboard`; "Back to site" returns to the marketing site.
-Sign-in and "Open workspace" links land on the dashboard.
+The workspace shell exposes only routes that exist:
 
-## Dashboard data
+| Nav item | Routes | Notes |
+| --- | --- | --- |
+| Dashboard | `/dashboard` | Aggregate overview |
+| Projects | `/projects`, `/projects/[projectId]` | Create projects and contracts; open saved analyses |
+| Contracts | `/contracts`, `/contracts/[contractId]` | Comparison workspace and read-only version history |
+| History | `/history`, `/analyses/[analysisId]` | Cross-project history and saved analysis detail |
+
+Add an entry to `NAV_ITEMS` in `workspace-shell.tsx` in the same change that adds the route, so the
+sidebar never shows a dead link. Aliases (for example `/analyses` under History) keep the correct item
+active on detail routes. The top-bar breadcrumb derives from the active item.
+
+Inside the workspace the logo returns to `/dashboard`; "Back to site" returns to the marketing site.
+Sign-in and "Open workspace" links land on the dashboard. Project and contract pages can open the
+comparison workspace with `?project=<id>&contract=<id>`; the workspace preselects those records.
+
+## Data scope
 
 `/dashboard` reuses owner-scoped endpoints instead of an aggregate API. It fetches the project list
 once, then the latest saved analysis for each project, capped at 25 projects
@@ -79,6 +91,23 @@ once, then the latest saved analysis for each project, capped at 25 projects
 inspected projects and are labeled as partial when the cap or a request failure applies. No count is
 estimated or invented. If an aggregate `GET /api/v1/dashboard` is approved later, replace
 `src/lib/dashboard.ts` without changing the view.
+
+`/projects` lists every project. `/projects/[projectId]` loads the project and its contracts, then the
+latest 10 saved analyses. If the analysis history fails, the project and contracts still render and
+the history section shows a retryable warning.
+
+`/contracts/[contractId]` filters the latest 50 project analyses to runs whose baseline or candidate
+version belongs to the contract. Both the cap and the filter are stated in the UI; older runs remain
+available in the project history.
+
+`/history` reuses the per-project history endpoint. The all-projects view inspects at most 25 projects
+and shows the latest 5 analyses from each, merged newest-first and capped at 75 entries
+(`src/lib/history.ts`). The selected-project view uses the server's cursor pagination with a page size
+of 20. Failures and caps are labeled; no history row is synthesized.
+
+`/analyses/[analysisId]` renders a persisted `AnalysisRunDetailDto` only. Findings, limitations,
+reports, source evidence, the impact map, and regression checks come from that run. A failed run is
+labeled as failed rather than presented as a clean comparison.
 
 
 ## Components

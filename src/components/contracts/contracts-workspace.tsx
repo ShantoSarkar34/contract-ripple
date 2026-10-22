@@ -49,13 +49,19 @@ function ErrorNotice({ error, onRetry }: { error: SubmitError; onRetry?: () => v
   );
 }
 
-export default function ContractsWorkspace() {
+export default function ContractsWorkspace({
+  initialProjectId,
+  initialContractId,
+}: {
+  initialProjectId?: string;
+  initialContractId?: string;
+}) {
   const [readiness, setReadiness] = useState<"checking" | "up" | "down">("checking");
 
   const [projects, setProjects] = useState<ProjectDto[]>([]);
   const [projectsState, setProjectsState] = useState<LoadState>("loading");
   const [projectsError, setProjectsError] = useState<SubmitError | null>(null);
-  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState(initialProjectId ?? "");
   const [newProjectName, setNewProjectName] = useState("");
   const [creatingProject, setCreatingProject] = useState(false);
   const [projectError, setProjectError] = useState<SubmitError | null>(null);
@@ -89,6 +95,18 @@ export default function ContractsWorkspace() {
   const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
   const [historyError, setHistoryError] = useState<SubmitError | null>(null);
   const selectedProjectRef = useRef("");
+  const initialContractRef = useRef(initialContractId ?? "");
+
+  function nextContractId(contracts: ContractDto[], current: string): string {
+    const preferred = initialContractRef.current;
+    initialContractRef.current = "";
+    if (preferred && contracts.some((contract) => contract.id === preferred)) {
+      return preferred;
+    }
+    return current && contracts.some((contract) => contract.id === current)
+      ? current
+      : (contracts[0]?.id ?? "");
+  }
 
   async function reloadProjects(): Promise<void> {
     try {
@@ -113,11 +131,7 @@ export default function ContractsWorkspace() {
       setContracts(response.contracts);
       setContractsState("ready");
       setContractsError(null);
-      setSelectedContractId((current) =>
-        current && response.contracts.some((contract) => contract.id === current)
-          ? current
-          : (response.contracts[0]?.id ?? ""),
-      );
+      setSelectedContractId((current) => nextContractId(response.contracts, current));
     } catch (error) {
       setContractsError(toSubmitError(error));
       setContractsState("error");
@@ -228,11 +242,7 @@ export default function ContractsWorkspace() {
         setContracts(response.contracts);
         setContractsState("ready");
         setContractsError(null);
-        setSelectedContractId((current) =>
-          current && response.contracts.some((contract) => contract.id === current)
-            ? current
-            : (response.contracts[0]?.id ?? ""),
-        );
+        setSelectedContractId((current) => nextContractId(response.contracts, current));
       } catch (error) {
         if (cancelled) {
           return;
@@ -521,14 +531,14 @@ export default function ContractsWorkspace() {
             <h1 className="text-3xl font-bold tracking-tight text-foreground">
               Contract review workspace
             </h1>
-            <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-400">
+            <p className="mt-2 max-w-2xl text-sm text-muted">
               Create a project, upload baseline and candidate OpenAPI contracts, and review every
               classified difference with its JSON Pointer evidence. Then connect changed operations
               to frontend source files in the evidence-backed impact map.
             </p>
           </div>
           <div className="text-right text-xs">
-            <p className="font-medium text-slate-500 dark:text-slate-400">API endpoint</p>
+            <p className="font-medium text-subtle">API endpoint</p>
             <code className="text-primary">{API_BASE_URL}</code>
             <p className="mt-1">
               <span
@@ -537,7 +547,7 @@ export default function ContractsWorkspace() {
                     ? "font-semibold text-success"
                     : readiness === "down"
                       ? "font-semibold text-danger"
-                      : "font-semibold text-slate-500 dark:text-slate-400"
+                      : "font-semibold text-subtle"
                 }
               >
                 {readiness === "up"
@@ -554,7 +564,7 @@ export default function ContractsWorkspace() {
       <div className="sticky top-16 z-10 -mx-4 mb-6 border-y border-line/70 bg-background/85 px-4 py-2 backdrop-blur md:-mx-8 md:px-8">
         <nav
           aria-label="Workspace context"
-          className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400"
+          className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-subtle"
         >
           <span className="font-semibold uppercase tracking-wide text-foreground">Workspace</span>
           {selectedProject ? (
@@ -594,12 +604,12 @@ export default function ContractsWorkspace() {
       <div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
         <aside className="space-y-6">
           <section className="card p-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-subtle">
               1 · Project
             </h2>
 
             {projectsState === "loading" ? (
-              <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">Loading projects…</p>
+              <p className="mt-3 text-sm text-subtle">Loading projects…</p>
             ) : null}
 
             {projectsState === "error" && projectsError ? (
@@ -624,7 +634,7 @@ export default function ContractsWorkspace() {
             ) : null}
 
             {projectsState === "ready" && projects.length === 0 ? (
-              <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+              <p className="mt-3 text-sm text-subtle">
                 No projects yet. Create the first one below.
               </p>
             ) : null}
@@ -656,18 +666,18 @@ export default function ContractsWorkspace() {
           </section>
 
           <section className="card p-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-subtle">
               2 · Contract
             </h2>
 
             {!selectedProjectId ? (
-              <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+              <p className="mt-3 text-sm text-subtle">
                 Select or create a project to manage contracts.
               </p>
             ) : null}
 
             {contractsState === "loading" || (contractsState === "idle" && selectedProjectId) ? (
-              <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">Loading contracts…</p>
+              <p className="mt-3 text-sm text-subtle">Loading contracts…</p>
             ) : null}
 
             {contractsState === "error" && contractsError ? (
@@ -689,11 +699,11 @@ export default function ContractsWorkspace() {
                       className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm transition-colors ${
                         contract.id === selectedContractId
                           ? "bg-primary-light text-primary"
-                          : "hover:bg-slate-100 dark:hover:bg-slate-800"
+                          : "hover:bg-surface-strong"
                       }`}
                     >
                       <span className="font-medium">{contract.name}</span>
-                      <span className="text-xs text-slate-500 dark:text-slate-400">
+                      <span className="text-xs text-subtle">
                         {contract.versionCount}
                       </span>
                     </button>
@@ -703,7 +713,7 @@ export default function ContractsWorkspace() {
             ) : null}
 
             {contractsState === "ready" && contracts.length === 0 ? (
-              <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+              <p className="mt-3 text-sm text-subtle">
                 No contracts in this project yet.
               </p>
             ) : null}
@@ -742,18 +752,18 @@ export default function ContractsWorkspace() {
               aria-busy={historyState === "loading" || historyState === "idle"}
             >
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-subtle">
                   Saved history
                 </h2>
                 {historyState === "ready" && historyTotal > 0 ? (
-                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                  <span className="text-xs text-subtle">
                     {history.length} of {historyTotal}
                   </span>
                 ) : null}
               </div>
 
               {historyState === "loading" || historyState === "idle" ? (
-                <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+                <p className="mt-3 text-sm text-subtle">
                   Loading saved comparisons…
                 </p>
               ) : null}
@@ -768,7 +778,7 @@ export default function ContractsWorkspace() {
               ) : null}
 
               {historyState === "ready" && history.length === 0 ? (
-                <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+                <p className="mt-3 text-sm text-subtle">
                   No saved comparisons yet. Run one above and it will appear here.
                 </p>
               ) : null}
@@ -782,10 +792,8 @@ export default function ContractsWorkspace() {
                           type="button"
                           onClick={() => void handleOpenAnalysis(run.id)}
                           aria-current={run.id === analysis?.id ? "true" : undefined}
-                          className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 ${
-                            run.id === analysis?.id
-                              ? "bg-primary-light text-primary"
-                              : ""
+                          className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-surface-strong ${
+                            run.id === analysis?.id ? "bg-primary-light text-primary" : ""
                           }`}
                         >
                           <span className="block font-medium">
@@ -794,7 +802,7 @@ export default function ContractsWorkspace() {
                                 run.candidateVersionLabel ?? "candidate"
                               }`}
                           </span>
-                          <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
+                          <span className="mt-0.5 block text-xs text-subtle">
                             {new Date(run.createdAt).toLocaleString()} · {run.totalFindings}{" "}
                             changes · {run.potentiallyBreakingCount} potentially breaking
                             {run.truncated ? " · truncated" : ""}
@@ -826,11 +834,11 @@ export default function ContractsWorkspace() {
           ) : null}
         </aside>
 
-        <main className="space-y-6">
+        <main className="min-w-0 space-y-6">
           {!selectedContract ? (
             <section className="card p-8 text-center">
               <h2 className="text-lg font-semibold text-foreground">Select a contract</h2>
-              <p className="mx-auto mt-2 max-w-md text-sm text-slate-500 dark:text-slate-400">
+              <p className="mx-auto mt-2 max-w-md text-sm text-subtle">
                 Choose a project and contract on the left, or create them, to upload contract
                 versions and run a comparison.
               </p>
@@ -838,12 +846,12 @@ export default function ContractsWorkspace() {
           ) : (
             <>
               <section className="card p-4">
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-subtle">
                   3 · Versions of {selectedContract.name}
                 </h2>
 
                 {versionsState === "loading" || (versionsState === "idle" && selectedContractId) ? (
-                  <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+                  <p className="mt-3 text-sm text-subtle">
                     Loading versions…
                   </p>
                 ) : null}
@@ -858,7 +866,7 @@ export default function ContractsWorkspace() {
                 ) : null}
 
                 {versionsState === "ready" && versions.length === 0 ? (
-                  <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+                  <p className="mt-3 text-sm text-subtle">
                     No versions yet. Upload a baseline and a candidate below.
                   </p>
                 ) : null}
@@ -869,12 +877,12 @@ export default function ContractsWorkspace() {
                       {versions.map((version) => (
                         <li
                           key={version.id}
-                          className="rounded-md border border-slate-200 px-3 py-2 text-xs dark:border-slate-700"
+                          className="rounded-md border border-line px-3 py-2 text-xs"
                         >
                           <span className="font-semibold text-foreground">
                             {version.label ?? version.id.slice(0, 8)}
                           </span>
-                          <span className="ml-2 text-slate-500 dark:text-slate-400">
+                          <span className="ml-2 text-subtle">
                             {version.format} · {version.openapiVersion ?? "?"} ·{" "}
                             {Math.round(version.contentBytes / 1024)} KB
                           </span>
@@ -883,7 +891,7 @@ export default function ContractsWorkspace() {
                     </ul>
 
                     <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">
+                      <label className="block text-xs font-medium text-subtle">
                         Baseline version
                         <select
                           className="input mt-1"
@@ -897,7 +905,7 @@ export default function ContractsWorkspace() {
                           ))}
                         </select>
                       </label>
-                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">
+                      <label className="block text-xs font-medium text-subtle">
                         Candidate version
                         <select
                           className="input mt-1"
@@ -925,23 +933,23 @@ export default function ContractsWorkspace() {
               </section>
 
               <section className="card p-4">
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-subtle">
                   Upload and compare new versions
                 </h2>
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="space-y-1">
                       <label
                         htmlFor="baseline-content"
-                        className="text-sm font-medium text-foreground"
+                        className="block text-sm font-medium text-foreground"
                       >
                         Baseline (before)
                       </label>
                       <input
                         type="file"
                         accept=".json,.yaml,.yml,application/json,text/yaml"
-                        className="text-xs text-slate-500 dark:text-slate-400"
+                        className="block w-full text-xs text-subtle"
                         onChange={(event) => handleFile(event, setBaselineContent)}
                       />
                     </div>
@@ -961,17 +969,17 @@ export default function ContractsWorkspace() {
                   </div>
 
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="space-y-1">
                       <label
                         htmlFor="candidate-content"
-                        className="text-sm font-medium text-foreground"
+                        className="block text-sm font-medium text-foreground"
                       >
                         Candidate (after)
                       </label>
                       <input
                         type="file"
                         accept=".json,.yaml,.yml,application/json,text/yaml"
-                        className="text-xs text-slate-500 dark:text-slate-400"
+                        className="block w-full text-xs text-subtle"
                         onChange={(event) => handleFile(event, setCandidateContent)}
                       />
                     </div>
@@ -1000,7 +1008,7 @@ export default function ContractsWorkspace() {
                   >
                     {submitting ? "Analysing…" : "Upload and compare"}
                   </button>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-subtle">
                     Both contracts are validated before anything is saved.
                   </p>
                 </div>

@@ -22,21 +22,21 @@ export default function RegressionSuggestions({
     <section id="regression-suggestions" className="card scroll-mt-24 p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-subtle">
             5 · Regression checks
           </h2>
-          <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-400">
+          <p className="mt-2 max-w-2xl text-sm text-muted">
             Review prompts derived from the classified findings for each changed operation. They
             are not executable tests and do not claim that a failure has occurred.
           </p>
         </div>
-        <p className="text-xs text-slate-500 dark:text-slate-400">
+        <p className="text-xs text-subtle">
           {suggestions.length} operation{suggestions.length === 1 ? "" : "s"}
         </p>
       </div>
 
       {suggestions.length === 0 ? (
-        <div className="mt-4 rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+        <div className="mt-4 rounded-md border border-dashed border-line-strong p-4 text-sm text-subtle">
           <p>No operation-scoped findings produced regression suggestions.</p>
           {withoutOperation > 0 ? (
             <p className="mt-1 text-xs">
@@ -50,16 +50,14 @@ export default function RegressionSuggestions({
           {visible.map((suggestion) => (
             <article
               key={suggestion.id}
-              className="rounded-lg border border-slate-200 p-4 dark:border-slate-700"
+              className="rounded-lg border border-line p-4"
             >
               <div className="flex flex-wrap items-center gap-2">
                 <span className={`badge ${RISK_BADGE_CLASSES[suggestion.risk]}`}>
                   {RISK_LABELS[suggestion.risk]}
                 </span>
                 <span
-                  className={`inline-flex items-center rounded px-2 py-0.5 text-[11px] font-bold uppercase ${methodClass(
-                    suggestion.method,
-                  )}`}
+                  className={`inline-flex items-center rounded px-2 py-0.5 text-[11px] font-bold uppercase ${methodClass(suggestion.method)}`}
                 >
                   {suggestion.method}
                 </span>
@@ -67,20 +65,20 @@ export default function RegressionSuggestions({
                   {suggestion.path}
                 </h3>
                 {suggestion.operationId ? (
-                  <code className="text-xs text-slate-500 dark:text-slate-400">
+                  <code className="text-xs text-subtle">
                     {suggestion.operationId}
                   </code>
                 ) : null}
               </div>
 
-              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+              <p className="mt-2 text-sm text-muted">
                 {suggestion.rationale}
               </p>
 
-              <h4 className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <h4 className="mt-3 text-xs font-semibold uppercase tracking-wide text-subtle">
                 Suggested checks
               </h4>
-              <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-slate-600 dark:text-slate-300">
+              <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted">
                 {suggestion.suggestedChecks.map((check) => (
                   <li key={check}>{check}</li>
                 ))}
@@ -92,13 +90,13 @@ export default function RegressionSuggestions({
                     Evidence from {suggestion.findingIds.length} finding
                     {suggestion.findingIds.length === 1 ? "" : "s"}
                   </summary>
-                  <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-slate-600 dark:text-slate-300">
+                  <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-muted">
                     {suggestion.evidence.map((evidence, index) => (
                       <li key={`${index}:${evidence}`}>{evidence}</li>
                     ))}
                   </ul>
                   {suggestion.findingIds.length > suggestion.evidence.length ? (
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    <p className="mt-1 text-xs text-subtle">
                       {suggestion.findingIds.length - suggestion.evidence.length} more finding
                       {suggestion.findingIds.length - suggestion.evidence.length === 1
                         ? ""

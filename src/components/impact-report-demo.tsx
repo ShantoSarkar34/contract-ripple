@@ -86,7 +86,7 @@ export default function ImpactReportDemo() {
             <span className="h-4 w-4 rounded-full bg-primary"></span>
             Recommended next steps
           </h3>
-          <ul className="text-sm text-slate-600 dark:text-slate-300 space-y-2 list-disc pl-5">
+          <ul className="text-sm text-muted space-y-2 list-disc pl-5">
             <li>
               Update the <span className="font-mono text-primary">InvoiceForm</span> component to handle the new{" "}
               <span className="font-mono text-primary">POST /v1/invoices</span> endpoint.

@@ -63,31 +63,27 @@ function sourceLabel(snapshot: SourceSnapshotDto): string {
 
 function ImpactRow({ impact }: { impact: SourceImpactDto }) {
   return (
-    <li className="rounded-md border border-slate-200 p-3 dark:border-slate-700">
+    <li className="rounded-md border border-line p-3">
       <div className="flex flex-wrap items-center gap-2">
         <span
-          className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-bold uppercase ${methodClass(
-            impact.matchedMethod,
-          )}`}
+          className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-bold uppercase ${methodClass(impact.matchedMethod)}`}
         >
           {impact.matchedMethod}
         </span>
         <span className="font-mono text-sm font-semibold text-foreground">
           {impact.matchedPath}
         </span>
-        <span className="text-xs text-slate-500 dark:text-slate-400">
+        <span className="text-xs text-subtle">
           call path <span className="font-mono">{impact.path}</span>
         </span>
         <span
-          className={`ml-auto text-xs font-semibold ${
-            CONFIDENCE_CLASSES[impact.confidence]
-          }`}
+          className={`ml-auto text-xs font-semibold ${CONFIDENCE_CLASSES[impact.confidence]}`}
         >
           {CONFIDENCE_LABELS[impact.confidence]} confidence
         </span>
       </div>
 
-      <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+      <p className="mt-2 text-xs text-subtle">
         {impact.operationId ? (
           <>
             operation <span className="font-mono">{impact.operationId}</span> ·{" "}
@@ -95,10 +91,10 @@ function ImpactRow({ impact }: { impact: SourceImpactDto }) {
         ) : null}
         line {impact.line}, column {impact.column}
       </p>
-      <pre className="mt-2 overflow-x-auto rounded bg-slate-50 p-2 font-mono text-xs text-slate-700 dark:bg-slate-900 dark:text-slate-200">
+      <pre className="mt-2 overflow-x-auto rounded bg-surface-muted p-2 font-mono text-xs text-foreground">
         {impact.snippet}
       </pre>
-      <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{impact.evidence}</p>
+      <p className="mt-2 text-xs text-subtle">{impact.evidence}</p>
     </li>
   );
 }
@@ -249,22 +245,22 @@ export default function SourceImpactPanel({
     <section id="impact-map" className="card scroll-mt-24 p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-subtle">
             4 · Source impact
           </h2>
-          <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-400">
+          <p className="mt-2 max-w-2xl text-sm text-muted">
             Upload a ZIP of your frontend or analyze a GitHub repository to find calls that match
             the changed operations in this comparison. Every result includes file, line, and source
             evidence.
           </p>
         </div>
-        <p className="text-xs text-slate-500 dark:text-slate-400">Evidence-backed static analysis</p>
+        <p className="text-xs text-subtle">Evidence-backed static analysis</p>
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <div className="rounded-md border border-slate-200 p-3 dark:border-slate-700">
+        <div className="rounded-md border border-line p-3">
           <h3 className="text-sm font-semibold text-foreground">ZIP archive</h3>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-xs text-subtle">
             TypeScript and JavaScript only. Maximum 10 MiB. Files are analyzed in memory and never
             executed.
           </p>
@@ -272,7 +268,7 @@ export default function SourceImpactPanel({
             ref={fileInputRef}
             type="file"
             accept=".zip,application/zip"
-            className="mt-3 block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-secondary-light file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-foreground dark:text-slate-300 dark:file:bg-slate-800"
+            className="mt-3 block w-full text-sm text-muted file:mr-3 file:rounded-md file:border-0 file:bg-secondary-light file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-foreground"
             aria-label="Source ZIP archive"
             onChange={(event) => setZipFile(event.target.files?.[0] ?? null)}
           />
@@ -286,9 +282,9 @@ export default function SourceImpactPanel({
           </button>
         </div>
 
-        <div className="rounded-md border border-slate-200 p-3 dark:border-slate-700">
+        <div className="rounded-md border border-line p-3">
           <h3 className="text-sm font-semibold text-foreground">GitHub repository</h3>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-xs text-subtle">
             Read-only analysis through the official GitHub API. The server token is never sent to
             the browser.
           </p>
@@ -313,7 +309,7 @@ export default function SourceImpactPanel({
             </p>
           ) : null}
           {githubConfigured === null ? (
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+            <p className="mt-2 text-xs text-subtle">
               {snapshotsState === "error"
                 ? "GitHub configuration status could not be loaded."
                 : "Checking GitHub configuration…"}
@@ -347,13 +343,13 @@ export default function SourceImpactPanel({
 
       <div className="mt-5">
         {snapshotsState === "loading" ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-sm text-subtle">
             Loading previous source analyses…
           </p>
         ) : null}
 
         {snapshotsState === "ready" && !active ? (
-          <div className="rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+          <div className="rounded-md border border-dashed border-line-strong p-4 text-sm text-subtle">
             No source analysis has been run for this comparison yet. Analyze a ZIP archive or a
             GitHub repository to look for affected integrations.
           </div>
@@ -364,31 +360,31 @@ export default function SourceImpactPanel({
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h3 className="text-base font-semibold text-foreground">
                 {sourceLabel(active)}
-                <span className="ml-2 text-sm font-normal text-slate-500 dark:text-slate-400">
+                <span className="ml-2 text-sm font-normal text-subtle">
                   {new Date(active.createdAt).toLocaleString()}
                 </span>
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-subtle">
                 {active.fileCount} file(s) scanned · {active.skippedCount} skipped ·{" "}
                 {formatBytes(active.totalBytes)}
               </p>
             </div>
 
             <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <div className="rounded-md bg-slate-50 p-3 dark:bg-slate-900">
-                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <div className="rounded-md bg-surface-muted p-3">
+                <dt className="text-xs font-medium uppercase tracking-wide text-subtle">
                   Affected calls
                 </dt>
                 <dd className="mt-1 text-2xl font-bold text-primary">{active.impactCount}</dd>
               </div>
-              <div className="rounded-md bg-slate-50 p-3 dark:bg-slate-900">
-                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <div className="rounded-md bg-surface-muted p-3">
+                <dt className="text-xs font-medium uppercase tracking-wide text-subtle">
                   Files with matches
                 </dt>
                 <dd className="mt-1 text-2xl font-bold text-foreground">{groupedImpacts.size}</dd>
               </div>
-              <div className="rounded-md bg-slate-50 p-3 dark:bg-slate-900">
-                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <div className="rounded-md bg-surface-muted p-3">
+                <dt className="text-xs font-medium uppercase tracking-wide text-subtle">
                   Source type
                 </dt>
                 <dd className="mt-1 text-sm font-semibold text-foreground">
@@ -426,11 +422,11 @@ export default function SourceImpactPanel({
             )}
 
             {active.limitations.length > 0 ? (
-              <details className="rounded-md border border-slate-200 p-3 text-sm dark:border-slate-700">
+              <details className="rounded-md border border-line p-3 text-sm">
                 <summary className="cursor-pointer font-medium text-foreground">
                   Analysis limitations
                 </summary>
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-slate-600 dark:text-slate-400">
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-muted">
                   {active.limitations.map((limitation) => (
                     <li key={limitation}>{limitation}</li>
                   ))}
@@ -442,7 +438,7 @@ export default function SourceImpactPanel({
 
         {snapshots.length > 0 ? (
           <div className="mt-5">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-subtle">
               Source analysis history for this comparison
             </h3>
             <ul className="mt-2 space-y-1">
@@ -450,14 +446,14 @@ export default function SourceImpactPanel({
                 <li key={snapshot.id}>
                   <button
                     type="button"
-                    className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 ${
-                      active?.id === snapshot.id ? "bg-slate-100 dark:bg-slate-800" : ""
-                    }`}
+                    className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-surface-strong ${
+                    active?.id === snapshot.id ? "bg-surface-strong" : ""
+                  }`}
                     disabled={loadingSnapshot}
                     onClick={() => void handleLoadSnapshot(snapshot.id)}
                   >
                     <span className="font-medium text-foreground">{sourceLabel(snapshot)}</span>
-                    <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
+                    <span className="mt-0.5 block text-xs text-subtle">
                       {snapshot.impactCount} affected call(s) ·{" "}
                       {new Date(snapshot.createdAt).toLocaleString()}
                     </span>
