@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import type { AnalysisRunDto, RiskLevel } from "@contract-ripple/shared";
+import type { RiskLevel } from "@contract-ripple/shared";
 import { AuthGate } from "@/components/workspace/auth-gate";
+import { AnalysisRiskBadges } from "@/components/workspace/analysis-badges";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState, SkeletonCard } from "@/components/ui/feedback";
@@ -37,47 +38,6 @@ function messageFor(error: unknown): string {
     return error.message;
   }
   return error instanceof Error ? error.message : "Could not load your dashboard.";
-}
-
-function AnalysisSummary({ analysis }: { analysis: AnalysisRunDto }) {
-  if (analysis.status === "failed") {
-    return (
-      <div className="flex flex-wrap items-center gap-1.5">
-        <Badge tone="danger" withDot>
-          Analysis failed
-        </Badge>
-        <span className="text-xs text-subtle">The stored run did not complete.</span>
-      </div>
-    );
-  }
-
-  if (analysis.totalFindings === 0) {
-    return (
-      <div className="flex flex-wrap items-center gap-1.5">
-        <Badge tone="neutral" withDot>
-          No changes
-        </Badge>
-        {analysis.truncated ? <Badge tone="warning">Truncated</Badge> : null}
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {analysis.potentiallyBreakingCount > 0 ? (
-        <Badge tone="danger">
-          {analysis.potentiallyBreakingCount} potentially breaking
-        </Badge>
-      ) : null}
-      {analysis.unknownCount > 0 ? (
-        <Badge tone="warning">{analysis.unknownCount} unknown</Badge>
-      ) : null}
-      {analysis.nonBreakingCount > 0 ? (
-        <Badge tone="success">{analysis.nonBreakingCount} non-breaking</Badge>
-      ) : null}
-      {analysis.truncated ? <Badge tone="warning">Truncated</Badge> : null}
-    </div>
-  );
 }
 
 function DashboardSkeleton() {
@@ -240,11 +200,19 @@ function DashboardBody() {
                   <h2 id="projects-heading" className="text-lg font-semibold tracking-tight">
                     Projects
                   </h2>
-                  {summary.capped ? (
-                    <span className="text-xs text-subtle">
-                      Inspected {summary.projects.length} of {summary.projectCount}
-                    </span>
-                  ) : null}
+                  <div className="flex flex-wrap items-center gap-3 text-xs">
+                    {summary.capped ? (
+                      <span className="text-subtle">
+                        Inspected {summary.projects.length} of {summary.projectCount}
+                      </span>
+                    ) : null}
+                    <Link
+                      href="/projects"
+                      className="font-semibold text-primary transition-colors hover:text-primary-hover"
+                    >
+                      View all projects
+                    </Link>
+                  </div>
                 </div>
 
                 {hasProjects ? (
@@ -259,7 +227,12 @@ function DashboardBody() {
                                 className="truncate text-sm font-semibold text-foreground"
                                 title={project.name}
                               >
-                                {project.name}
+                                <Link
+                                  href={`/projects/${project.id}`}
+                                  className="transition-colors hover:text-primary"
+                                >
+                                  {project.name}
+                                </Link>
                               </h3>
                               <p className="mt-1 line-clamp-2 text-xs leading-5 text-subtle">
                                 {project.description ?? "No description."}
@@ -294,11 +267,35 @@ function DashboardBody() {
                                 History could not be loaded for this project.
                               </p>
                             ) : latest ? (
-                              <AnalysisSummary analysis={latest} />
+                              <div className="space-y-2">
+                                <AnalysisRiskBadges analysis={latest} />
+                                <div className="flex flex-wrap gap-3 text-xs font-semibold">
+                                  <Link
+                                    href={`/analyses/${latest.id}`}
+                                    className="text-primary transition-colors hover:text-primary-hover"
+                                  >
+                                    Open latest analysis →
+                                  </Link>
+                                  <Link
+                                    href={`/projects/${project.id}`}
+                                    className="text-muted transition-colors hover:text-foreground"
+                                  >
+                                    Project
+                                  </Link>
+                                </div>
+                              </div>
                             ) : (
-                              <p className="text-xs text-subtle">
-                                No comparison saved for this project yet.
-                              </p>
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-xs text-subtle">
+                                  No comparison saved for this project yet.
+                                </p>
+                                <Link
+                                  href={`/projects/${project.id}`}
+                                  className="text-xs font-semibold text-primary transition-colors hover:text-primary-hover"
+                                >
+                                  Open project
+                                </Link>
+                              </div>
                             )}
                           </div>
                         </article>
@@ -308,9 +305,9 @@ function DashboardBody() {
                 ) : (
                   <EmptyState
                     title="No projects yet"
-                    description="Create a project in the contract workspace, upload a baseline and candidate OpenAPI document, then run your first comparison."
+                    description="Create a project, add contract versions, then run your first comparison. Saved analyses and their risk summaries will appear here."
                     action={
-                      <Link href="/contracts" className="btn-primary">
+                      <Link href="/projects" className="btn-primary">
                         Create your first project
                       </Link>
                     }

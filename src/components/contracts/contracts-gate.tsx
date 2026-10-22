@@ -3,7 +3,13 @@
 import { AuthGate } from "@/components/workspace/auth-gate";
 import ContractsWorkspace from "./contracts-workspace";
 
-export default function ContractsGate() {
+export default function ContractsGate({
+  initialProjectId,
+  initialContractId,
+}: {
+  initialProjectId?: string;
+  initialContractId?: string;
+}) {
   return (
     <AuthGate
       signInTitle="Sign in to use the workspace"
@@ -14,7 +20,10 @@ export default function ContractsGate() {
         </p>
       }
     >
-      <ContractsWorkspace />
+      <ContractsWorkspace
+        initialProjectId={initialProjectId}
+        initialContractId={initialContractId}
+      />
     </AuthGate>
   );
 }

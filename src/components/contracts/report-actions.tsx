@@ -52,7 +52,7 @@ export default function ReportActions({ analysis }: { analysis: AnalysisRunDetai
   return (
     <div className="flex flex-col items-start gap-2 sm:items-end">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        <span className="text-xs font-semibold uppercase tracking-wide text-subtle">
           Export
         </span>
         <button
@@ -72,7 +72,7 @@ export default function ReportActions({ analysis }: { analysis: AnalysisRunDetai
           {pending === "markdown" ? "Preparing…" : "Markdown"}
         </button>
       </div>
-      <p className="text-right text-[11px] text-slate-500 dark:text-slate-400">
+      <p className="text-right text-[11px] text-subtle">
         Findings, suggestions, and the latest source analysis.
       </p>
       {status ? (

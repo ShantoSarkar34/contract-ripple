@@ -21,7 +21,7 @@ export function displayPath(filePath: string): string {
 export const RISK_BADGE_CLASSES: Record<RiskLevel, string> = {
   non_breaking: "bg-success-light text-success border border-success/20",
   potentially_breaking: "bg-danger-light text-danger border border-danger/20",
-  unknown: "bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
+  unknown: "bg-surface-strong text-muted border border-line",
 };
 
 export const CHANGE_TYPE_LABELS: Record<ChangeType, string> = {
@@ -57,7 +57,7 @@ export const CONFIDENCE_LABELS: Record<"high" | "medium" | "low", string> = {
 export const CONFIDENCE_CLASSES: Record<"high" | "medium" | "low", string> = {
   high: "text-success",
   medium: "text-warning",
-  low: "text-slate-500 dark:text-slate-400",
+  low: "text-subtle",
 };
 
 /** HTTP method color tokens used by the findings list. */
@@ -67,8 +67,8 @@ export const METHOD_CLASSES: Record<string, string> = {
   put: "bg-warning-light text-warning border border-warning/20",
   patch: "bg-warning-light text-warning border border-warning/20",
   delete: "bg-danger-light text-danger border border-danger/20",
-  options: "bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
-  head: "bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
+  options: "bg-surface-strong text-muted border border-line",
+  head: "bg-surface-strong text-muted border border-line",
 };
 
 export function methodClass(method: string | null): string {

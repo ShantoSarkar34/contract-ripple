@@ -43,7 +43,7 @@ type SummaryCardProps = {
 function SummaryCard({ label, value, className }: SummaryCardProps) {
   return (
     <div className="card p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+      <p className="text-xs font-medium uppercase tracking-wide text-subtle">
         {label}
       </p>
       <p className={`mt-1 text-2xl font-bold ${className}`}>{value}</p>
@@ -141,12 +141,12 @@ export default function ComparisonResults({ analysis }: { analysis: AnalysisRunD
           <h3 className="text-lg font-semibold text-foreground">
             Comparison report
             {analysis.label ? (
-              <span className="ml-2 text-sm font-normal text-slate-500 dark:text-slate-400">
+              <span className="ml-2 text-sm font-normal text-subtle">
                 {analysis.label}
               </span>
             ) : null}
           </h3>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-xs text-subtle">
             {new Date(analysis.createdAt).toLocaleString()} · {analysis.durationMs} ms
           </p>
         </div>
@@ -170,12 +170,12 @@ export default function ComparisonResults({ analysis }: { analysis: AnalysisRunD
 
       <dl className="grid gap-3 sm:grid-cols-2">
         <div className="card p-3 text-sm">
-          <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          <dt className="text-xs font-semibold uppercase tracking-wide text-subtle">
             Baseline
           </dt>
           <dd className="mt-1 text-foreground">
             {analysis.baseline.contractName}
-            <span className="text-slate-500 dark:text-slate-400">
+            <span className="text-subtle">
               {" "}
               · {analysis.baseline.versionLabel ?? analysis.baseline.versionId} · OpenAPI{" "}
               {analysis.baseline.openapi}
@@ -183,12 +183,12 @@ export default function ComparisonResults({ analysis }: { analysis: AnalysisRunD
           </dd>
         </div>
         <div className="card p-3 text-sm">
-          <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          <dt className="text-xs font-semibold uppercase tracking-wide text-subtle">
             Candidate
           </dt>
           <dd className="mt-1 text-foreground">
             {analysis.candidate.contractName}
-            <span className="text-slate-500 dark:text-slate-400">
+            <span className="text-subtle">
               {" "}
               · {analysis.candidate.versionLabel ?? analysis.candidate.versionId} · OpenAPI{" "}
               {analysis.candidate.openapi}
@@ -208,7 +208,7 @@ export default function ComparisonResults({ analysis }: { analysis: AnalysisRunD
           <summary className="cursor-pointer font-semibold text-foreground">
             Analysis limitations ({analysis.limitations.length})
           </summary>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-slate-600 dark:text-slate-400">
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-muted">
             {analysis.limitations.map((limitation) => (
               <li key={limitation}>{limitation}</li>
             ))}
@@ -217,7 +217,7 @@ export default function ComparisonResults({ analysis }: { analysis: AnalysisRunD
       ) : null}
 
       {analysis.findings.length === 0 ? (
-        <p className="card p-6 text-center text-sm text-slate-500 dark:text-slate-400">
+        <p className="card p-6 text-center text-sm text-subtle">
           No differences were detected between the selected versions.
         </p>
       ) : (
@@ -227,7 +227,7 @@ export default function ComparisonResults({ analysis }: { analysis: AnalysisRunD
             aria-label="Finding filters"
             className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
           >
-            <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
+            <label className="text-xs font-medium text-muted">
               Risk
               <select
                 className="input mt-1"
@@ -247,7 +247,7 @@ export default function ComparisonResults({ analysis }: { analysis: AnalysisRunD
               </select>
             </label>
 
-            <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
+            <label className="text-xs font-medium text-muted">
               Category
               <select
                 className="input mt-1"
@@ -263,7 +263,7 @@ export default function ComparisonResults({ analysis }: { analysis: AnalysisRunD
               </select>
             </label>
 
-            <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
+            <label className="text-xs font-medium text-muted">
               Method
               <select
                 className="input mt-1"
@@ -279,7 +279,7 @@ export default function ComparisonResults({ analysis }: { analysis: AnalysisRunD
               </select>
             </label>
 
-            <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
+            <label className="text-xs font-medium text-muted">
               Search
               <input
                 type="search"
@@ -292,7 +292,7 @@ export default function ComparisonResults({ analysis }: { analysis: AnalysisRunD
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs text-slate-500 dark:text-slate-400" aria-live="polite">
+            <p className="text-xs text-subtle" aria-live="polite">
               Showing {visibleFindings.length} of {filteredFindings.length} finding(s)
               {filteredFindings.length !== analysis.findings.length
                 ? `, filtered from ${analysis.findings.length}`
@@ -310,7 +310,7 @@ export default function ComparisonResults({ analysis }: { analysis: AnalysisRunD
           </div>
 
           {filteredFindings.length === 0 ? (
-            <div className="card p-6 text-center text-sm text-slate-500 dark:text-slate-400">
+            <div className="card p-6 text-center text-sm text-subtle">
               <p>No findings match the current filters.</p>
               <button
                 type="button"
@@ -322,12 +322,12 @@ export default function ComparisonResults({ analysis }: { analysis: AnalysisRunD
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+              <div className="contain-paint overflow-x-auto rounded-lg border border-line">
                 <table className="w-full min-w-[920px] border-collapse text-left text-sm">
                   <caption className="sr-only">
                     Classified differences between the baseline and candidate contracts.
                   </caption>
-                  <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                  <thead className="bg-surface-muted text-xs uppercase tracking-wide text-subtle">
                     <tr>
                       <th scope="col" className="px-3 py-2 font-semibold">Risk</th>
                       <th scope="col" className="px-3 py-2 font-semibold">Change</th>
@@ -341,12 +341,12 @@ export default function ComparisonResults({ analysis }: { analysis: AnalysisRunD
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                  <tbody className="divide-y divide-line">
                     {visibleFindings.map((finding) => {
                       const expanded = expandedId === finding.id;
                       return (
                         <Fragment key={finding.id}>
-                          <tr className="align-top hover:bg-slate-50 dark:hover:bg-slate-900/60">
+                          <tr className="align-top hover:bg-surface-muted">
                             <td className="px-3 py-2.5">
                               <span className={`badge ${RISK_BADGE_CLASSES[finding.risk]}`}>
                                 {RISK_LABELS[finding.risk]}
@@ -358,14 +358,12 @@ export default function ComparisonResults({ analysis }: { analysis: AnalysisRunD
                             <td className="px-3 py-2.5">
                               {finding.method ? (
                                 <span
-                                  className={`inline-flex items-center rounded px-2 py-0.5 text-[11px] font-bold uppercase ${methodClass(
-                                    finding.method,
-                                  )}`}
+                                  className={`inline-flex items-center rounded px-2 py-0.5 text-[11px] font-bold uppercase ${methodClass(finding.method)}`}
                                 >
                                   {finding.method}
                                 </span>
                               ) : (
-                                <span className="text-slate-400">—</span>
+                                <span className="text-subtle">—</span>
                               )}
                             </td>
                             <td className="max-w-[220px] px-3 py-2.5">
@@ -377,14 +375,14 @@ export default function ComparisonResults({ analysis }: { analysis: AnalysisRunD
                               </span>
                               {finding.operationId ? (
                                 <span
-                                  className="mt-0.5 block truncate font-mono text-[11px] text-slate-500 dark:text-slate-400"
+                                  className="mt-0.5 block truncate font-mono text-[11px] text-subtle"
                                   title={finding.operationId}
                                 >
                                   {finding.operationId}
                                 </span>
                               ) : null}
                             </td>
-                            <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-400">
+                            <td className="px-3 py-2.5 text-xs text-muted">
                               {CATEGORY_LABELS[finding.category]}
                             </td>
                             <td className="max-w-[280px] px-3 py-2.5">
@@ -394,7 +392,7 @@ export default function ComparisonResults({ analysis }: { analysis: AnalysisRunD
                             </td>
                             <td className="max-w-[220px] px-3 py-2.5">
                               <span
-                                className="block truncate font-mono text-[11px] text-slate-500 dark:text-slate-400"
+                                className="block truncate font-mono text-[11px] text-subtle"
                                 title={finding.location}
                               >
                                 {finding.location}
@@ -414,23 +412,23 @@ export default function ComparisonResults({ analysis }: { analysis: AnalysisRunD
                             </td>
                           </tr>
                           {expanded ? (
-                            <tr id={`finding-detail-${finding.id}`} className="bg-slate-50/80 dark:bg-slate-900/60">
+                            <tr id={`finding-detail-${finding.id}`} className="bg-surface-muted/80">
                               <td colSpan={8} className="px-3 py-4">
                                 <div className="space-y-3">
                                   <div>
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-subtle">
                                       Explanation
                                     </p>
-                                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                                    <p className="mt-1 text-sm text-muted">
                                       {finding.explanation}
                                     </p>
                                   </div>
 
                                   <div>
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-subtle">
                                       Evidence location
                                     </p>
-                                    <p className="mt-1 break-all font-mono text-xs text-slate-600 dark:text-slate-300">
+                                    <p className="mt-1 break-all font-mono text-xs text-muted">
                                       {finding.location}
                                     </p>
                                   </div>
@@ -442,7 +440,7 @@ export default function ComparisonResults({ analysis }: { analysis: AnalysisRunD
                                           <p className="text-[11px] font-semibold uppercase tracking-wide text-danger">
                                             Before
                                           </p>
-                                          <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all font-mono text-xs text-slate-700 dark:text-slate-200">
+                                          <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all font-mono text-xs text-foreground">
                                             {finding.before}
                                           </pre>
                                         </div>
@@ -452,7 +450,7 @@ export default function ComparisonResults({ analysis }: { analysis: AnalysisRunD
                                           <p className="text-[11px] font-semibold uppercase tracking-wide text-success">
                                             After
                                           </p>
-                                          <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all font-mono text-xs text-slate-700 dark:text-slate-200">
+                                          <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all font-mono text-xs text-foreground">
                                             {finding.after}
                                           </pre>
                                         </div>

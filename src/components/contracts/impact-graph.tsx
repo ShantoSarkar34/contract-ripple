@@ -38,7 +38,7 @@ const RISK_ACCENT: Record<GraphRiskLevel, string> = {
 const EDGE_STROKE: Record<GraphConfidence, string> = {
   high: "stroke-primary",
   medium: "stroke-warning",
-  low: "stroke-slate-400",
+  low: "stroke-subtle",
 };
 
 type GraphFilterState = {
@@ -243,24 +243,22 @@ export default function ImpactGraph({
   const activeFilters = filtersAreActive(filters);
 
   return (
-    <section aria-labelledby="impact-graph-heading" className="mt-6 border-t border-slate-200 pt-5 dark:border-slate-700">
+    <section aria-labelledby="impact-graph-heading" className="mt-6 border-t border-line pt-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <h3 id="impact-graph-heading" className="text-base font-semibold text-foreground">
             Impact map
           </h3>
-          <p className="mt-1 max-w-2xl text-sm text-slate-600 dark:text-slate-400">
+          <p className="mt-1 max-w-2xl text-sm text-muted">
             Changed API operations linked to source files by persisted static-analysis matches.
             Every line represents evidence from this snapshot.
           </p>
         </div>
-        <div className="inline-flex rounded-md border border-slate-200 p-0.5 dark:border-slate-700" role="group" aria-label="Impact map view">
+        <div className="inline-flex rounded-md border border-line p-0.5" role="group" aria-label="Impact map view">
           <button
             type="button"
             className={`rounded px-3 py-1.5 text-xs font-semibold transition-colors ${
-              view === "map"
-                ? "bg-primary text-white"
-                : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+              view === "map" ? "bg-primary text-on-primary" : "text-muted hover:bg-surface-strong"
             }`}
             aria-pressed={view === "map"}
             onClick={() => setView("map")}
@@ -270,9 +268,7 @@ export default function ImpactGraph({
           <button
             type="button"
             className={`rounded px-3 py-1.5 text-xs font-semibold transition-colors ${
-              view === "list"
-                ? "bg-primary text-white"
-                : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+              view === "list" ? "bg-primary text-on-primary" : "text-muted hover:bg-surface-strong"
             }`}
             aria-pressed={view === "list"}
             onClick={() => setView("list")}
@@ -287,7 +283,7 @@ export default function ImpactGraph({
         aria-label="Impact map filters"
         className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5"
       >
-        <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
+        <label className="text-xs font-medium text-muted">
           Risk
           <select
             className="input mt-1"
@@ -305,7 +301,7 @@ export default function ImpactGraph({
           </select>
         </label>
 
-        <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
+        <label className="text-xs font-medium text-muted">
           Category
           <select
             className="input mt-1"
@@ -321,7 +317,7 @@ export default function ImpactGraph({
           </select>
         </label>
 
-        <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
+        <label className="text-xs font-medium text-muted">
           Method
           <select
             className="input mt-1"
@@ -337,7 +333,7 @@ export default function ImpactGraph({
           </select>
         </label>
 
-        <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
+        <label className="text-xs font-medium text-muted">
           Match confidence
           <select
             className="input mt-1"
@@ -355,7 +351,7 @@ export default function ImpactGraph({
           </select>
         </label>
 
-        <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
+        <label className="text-xs font-medium text-muted">
           Search
           <input
             type="search"
@@ -368,7 +364,7 @@ export default function ImpactGraph({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-slate-500 dark:text-slate-400" aria-live="polite">
+        <p className="text-xs text-subtle" aria-live="polite">
           {summaryText}
           {graph.summary.truncated ? " · limited view" : ""}
         </p>
@@ -384,11 +380,11 @@ export default function ImpactGraph({
       </div>
 
       {graph.limitations.length > 0 ? (
-        <details className="mt-3 rounded-md border border-slate-200 p-3 text-sm dark:border-slate-700">
+        <details className="mt-3 rounded-md border border-line p-3 text-sm">
           <summary className="cursor-pointer font-medium text-foreground">
             Graph limitations ({graph.limitations.length})
           </summary>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-slate-600 dark:text-slate-400">
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-muted">
             {graph.limitations.map((limitation) => (
               <li key={limitation}>{limitation}</li>
             ))}
@@ -397,17 +393,17 @@ export default function ImpactGraph({
       ) : null}
 
       {graph.operations.length === 0 ? (
-        <p className="mt-4 rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+        <p className="mt-4 rounded-md border border-dashed border-line-strong p-4 text-sm text-subtle">
           No changed operations are available for this view. Adjust or clear the filters to see
           the evidence-backed graph.
         </p>
       ) : view === "map" ? (
         <div className="mt-4">
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs text-subtle">
             The map is a visual view. The Relationships view contains the same evidence in a
             keyboard- and screen-reader-friendly table.
           </p>
-          <div className="mt-2 overflow-x-auto rounded-md border border-slate-200 bg-slate-50/60 p-2 dark:border-slate-700 dark:bg-slate-950/40">
+          <div className="mt-2 overflow-x-auto rounded-md border border-line bg-surface-muted/60 p-2">
             <svg
               viewBox={`0 0 ${layout.width} ${layout.height}`}
               className="h-auto w-full min-w-[680px]"
@@ -542,11 +538,7 @@ function MapOperationNode({
         width={NODE_WIDTH}
         height={NODE_HEIGHT}
         rx={8}
-        className={`fill-white dark:fill-slate-900 ${
-          selected
-            ? "stroke-primary"
-            : "stroke-slate-300 dark:stroke-slate-700"
-        }`}
+        className={`fill-surface ${selected ? "stroke-primary" : "stroke-line"}`}
         strokeWidth={selected ? 2 : 1}
       />
       <rect width={4} height={NODE_HEIGHT} rx={2} className={RISK_ACCENT[operation.risk]} />
@@ -556,7 +548,7 @@ function MapOperationNode({
       <text x={14} y={37} className="fill-foreground font-mono text-[11px]">
         {truncate(operation.path, 31)}
       </text>
-      <text x={14} y={52} className="fill-slate-500 text-[10px] dark:fill-slate-400">
+      <text x={14} y={52} className="fill-subtle text-[10px]">
         {operation.findingCount} finding(s) · {RISK_LABELS[operation.risk]}
       </text>
     </g>
@@ -589,21 +581,17 @@ function MapFileNode({
         width={NODE_WIDTH}
         height={NODE_HEIGHT}
         rx={8}
-        className={`fill-white dark:fill-slate-900 ${
-          selected
-            ? "stroke-primary"
-            : "stroke-slate-300 dark:stroke-slate-700"
-        }`}
+        className={`fill-surface ${selected ? "stroke-primary" : "stroke-line"}`}
         strokeWidth={selected ? 2 : 1}
       />
       <rect width={4} height={NODE_HEIGHT} rx={2} className="fill-primary" />
       <text x={14} y={22} className="fill-foreground text-[11px] font-semibold">
         {truncate(fileName(file.filePath), 30)}
       </text>
-      <text x={14} y={38} className="fill-slate-500 font-mono text-[9px] dark:fill-slate-400">
+      <text x={14} y={38} className="fill-subtle font-mono text-[9px]">
         {truncate(directoryName(file.filePath), 34)}
       </text>
-      <text x={14} y={52} className="fill-slate-500 text-[10px] dark:fill-slate-400">
+      <text x={14} y={52} className="fill-subtle text-[10px]">
         {file.impactCount} match(es) · {CONFIDENCE_LABELS[file.highestConfidence]} confidence
       </text>
     </g>
@@ -612,7 +600,7 @@ function MapFileNode({
 
 function GraphLegend() {
   return (
-    <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-[11px] text-slate-500 dark:text-slate-400">
+    <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-[11px] text-subtle">
       <li className="inline-flex items-center gap-1.5">
         <span className="inline-block h-2.5 w-2.5 rounded-sm bg-danger" aria-hidden="true" />
         Potentially breaking operation
@@ -634,7 +622,7 @@ function GraphLegend() {
         Medium confidence match
       </li>
       <li className="inline-flex items-center gap-1.5">
-        <span className="inline-block h-0.5 w-6 border-t border-dotted border-slate-400" aria-hidden="true" />
+        <span className="inline-block h-0.5 w-6 border-t border-dotted border-line-strong" aria-hidden="true" />
         Low confidence match
       </li>
     </ul>
@@ -655,13 +643,13 @@ function RelationshipsTable({
   onSelectFile: (fileId: string) => void;
 }) {
   return (
-    <div className="mt-4 overflow-x-auto rounded-md border border-slate-200 dark:border-slate-700">
+    <div className="mt-4 overflow-x-auto rounded-md border border-line">
       <table className="w-full text-left text-sm">
         <caption className="sr-only">
           Changed API operations and their affected source files. This table contains the same
           evidence-backed relationships as the impact map.
         </caption>
-        <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+        <thead className="bg-surface-muted text-xs uppercase tracking-wide text-subtle">
           <tr>
             <th scope="col" className="px-3 py-2 font-semibold">Operation</th>
             <th scope="col" className="px-3 py-2 font-semibold">Risk</th>
@@ -671,7 +659,7 @@ function RelationshipsTable({
             <th scope="col" className="px-3 py-2 font-semibold">Evidence</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+        <tbody className="divide-y divide-line">
           {graph.operations.map((operation) => {
             const edges = graph.edges.filter((edge) => edge.source === operation.id);
             if (edges.length === 0) {
@@ -688,14 +676,14 @@ function RelationshipsTable({
                       {RISK_LABELS[operation.risk]}
                     </span>
                   </td>
-                  <td className="px-3 py-3 text-slate-600 dark:text-slate-400">
+                  <td className="px-3 py-3 text-muted">
                     {operation.findingCount}
                   </td>
-                  <td className="px-3 py-3 text-slate-500 dark:text-slate-400">
+                  <td className="px-3 py-3 text-subtle">
                     No persisted source match
                   </td>
-                  <td className="px-3 py-3 text-slate-500 dark:text-slate-400">—</td>
-                  <td className="px-3 py-3 text-slate-500 dark:text-slate-400">
+                  <td className="px-3 py-3 text-subtle">—</td>
+                  <td className="px-3 py-3 text-subtle">
                     Static analysis found no resolvable call for this operation.
                   </td>
                 </tr>
@@ -722,7 +710,7 @@ function RelationshipsTable({
                               {RISK_LABELS[operation.risk]}
                             </span>
                           </td>
-                          <td className="px-3 py-3 text-slate-600 dark:text-slate-400" rowSpan={edges.length}>
+                          <td className="px-3 py-3 text-muted" rowSpan={edges.length}>
                             {operation.findingCount}
                           </td>
                         </>
@@ -735,7 +723,7 @@ function RelationshipsTable({
                         >
                           {displayPath(file?.filePath ?? edge.target.replace(/^file:/, ""))}
                         </button>
-                        <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+                        <span className="mt-1 block text-xs text-subtle">
                           {edge.impactCount} call(s)
                         </span>
                       </td>
@@ -746,18 +734,18 @@ function RelationshipsTable({
                         {firstImpact ? (
                           <button
                             type="button"
-                            className="text-left text-xs text-slate-600 underline-offset-2 hover:text-primary hover:underline dark:text-slate-300"
+                            className="text-left text-xs text-muted underline-offset-2 hover:text-primary hover:underline"
                             onClick={() => onSelectImpact(firstImpact.id)}
                           >
                             Line {firstImpact.line}, column {firstImpact.column}
                             {edge.evidenceTruncated ? " · more matches" : ""}
                           </button>
                         ) : (
-                          <span className="text-xs text-slate-500 dark:text-slate-400">
+                          <span className="text-xs text-subtle">
                             Evidence unavailable
                           </span>
                         )}
-                        <span className="mt-1 block break-all font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                        <span className="mt-1 block break-all font-mono text-[11px] text-subtle">
                           {truncate(firstImpact?.snippet ?? "", 80)}
                         </span>
                         {selectedImpactId && firstImpact?.id === selectedImpactId ? (
@@ -789,9 +777,7 @@ function OperationIdentity({
     <button type="button" className="group text-left" onClick={onSelect}>
       <span className="flex flex-wrap items-center gap-1.5">
         <span
-          className={`inline-flex items-center rounded px-2 py-0.5 text-[11px] font-bold uppercase ${methodClass(
-            operation.method,
-          )}`}
+          className={`inline-flex items-center rounded px-2 py-0.5 text-[11px] font-bold uppercase ${methodClass(operation.method)}`}
         >
           {operation.method}
         </span>
@@ -800,7 +786,7 @@ function OperationIdentity({
         </span>
       </span>
       {operation.operationId ? (
-        <span className="mt-1 block text-[11px] text-slate-500 dark:text-slate-400">
+        <span className="mt-1 block text-[11px] text-subtle">
           operationId <span className="font-mono">{operation.operationId}</span>
         </span>
       ) : null}
@@ -821,7 +807,7 @@ function EvidenceDetail({
 }) {
   if (!selectedOperation && !selectedFile && !selectedImpact) {
     return (
-      <p className="mt-3 rounded-md border border-dashed border-slate-300 p-3 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
+      <p className="mt-3 rounded-md border border-dashed border-line-strong p-3 text-xs text-subtle">
         Select an operation or file in the map, or a row in the Relationships table, to inspect the
         underlying comparison findings and source evidence.
       </p>
@@ -829,14 +815,12 @@ function EvidenceDetail({
   }
 
   return (
-    <div className="mt-3 rounded-md border border-slate-200 bg-slate-50/60 p-3 dark:border-slate-700 dark:bg-slate-950/40">
+    <div className="mt-3 rounded-md border border-line bg-surface-muted/60 p-3">
       {selectedOperation ? (
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <span
-              className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-bold uppercase ${methodClass(
-                selectedOperation.method,
-              )}`}
+              className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-bold uppercase ${methodClass(selectedOperation.method)}`}
             >
               {selectedOperation.method}
             </span>
@@ -847,7 +831,7 @@ function EvidenceDetail({
               {RISK_LABELS[selectedOperation.risk]}
             </span>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-xs text-subtle">
             {selectedOperation.operationId
               ? `operationId ${selectedOperation.operationId} · `
               : ""}
@@ -856,9 +840,9 @@ function EvidenceDetail({
           </p>
           <ul className="mt-2 space-y-2">
             {selectedOperation.findings.map((finding) => (
-              <li key={finding.id} className="rounded-md border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-900">
+              <li key={finding.id} className="rounded-md border border-line bg-white p-2">
                 <p className="text-xs font-medium text-foreground">{finding.summary}</p>
-                <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                <p className="mt-1 text-[11px] text-subtle">
                   {categoryLabel(finding.category)} · {finding.changeType} ·{" "}
                   <span className="break-all font-mono">{finding.location}</span>
                 </p>
@@ -873,7 +857,7 @@ function EvidenceDetail({
           <h4 className="break-all font-mono text-sm font-semibold text-foreground">
             {displayPath(selectedFile.filePath)}
           </h4>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-xs text-subtle">
             {selectedFile.impactCount} source match(es) ·{" "}
             {CONFIDENCE_LABELS[selectedFile.highestConfidence]} confidence
           </p>
@@ -887,7 +871,7 @@ function EvidenceDetail({
 
       {selectedImpact ? (
         <div>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs text-subtle">
             Matched operation{" "}
             <span className="font-mono font-semibold text-foreground">
               {operationLabelFromSource(selectedImpact.edge.source)}
@@ -904,22 +888,22 @@ function EvidenceDetail({
 
 function ImpactEvidenceItem({ impact }: { impact: ImpactEvidence }) {
   return (
-    <li className="rounded-md border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-900">
+    <li className="rounded-md border border-line bg-white p-2">
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <span className={`font-semibold ${CONFIDENCE_CLASSES[impact.confidence]}`}>
           {CONFIDENCE_LABELS[impact.confidence]} confidence
         </span>
-        <span className="text-slate-500 dark:text-slate-400">
+        <span className="text-subtle">
           line {impact.line}, column {impact.column}
         </span>
-        <span className="ml-auto break-all font-mono text-[11px] text-slate-500 dark:text-slate-400">
+        <span className="ml-auto break-all font-mono text-[11px] text-subtle">
           {impact.call}
         </span>
       </div>
-      <pre className="mt-2 overflow-x-auto rounded bg-slate-50 p-2 font-mono text-[11px] text-slate-700 dark:bg-slate-950 dark:text-slate-200">
+      <pre className="mt-2 overflow-x-auto rounded bg-surface-muted p-2 font-mono text-[11px] text-foreground">
         {impact.snippet}
       </pre>
-      <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{impact.evidence}</p>
+      <p className="mt-1 text-[11px] text-subtle">{impact.evidence}</p>
     </li>
   );
 }
