@@ -81,7 +81,10 @@ export default function ReportActions({ analysis }: { analysis: AnalysisRunDetai
         </p>
       ) : null}
       {error ? (
-        <div className="max-w-xs rounded-md border border-danger/30 bg-danger-light p-2 text-left text-xs text-danger">
+        <div
+          role="alert"
+          className="max-w-xs rounded-md border border-danger/30 bg-danger-light p-2 text-left text-xs text-danger"
+        >
           <p className="font-medium">{error.message}</p>
           {error.details.length > 0 ? (
             <ul className="mt-1 list-disc space-y-0.5 pl-4">

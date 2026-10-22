@@ -171,7 +171,7 @@ export function Dialog({
           <button
             type="button"
             className={cn(
-              "inline-flex min-h-9 items-center justify-center rounded-lg px-2 transition-colors",
+              "inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-2 transition-colors",
               tone === "dark"
                 ? "-mr-2 -mt-1 text-sidebar-muted hover:bg-sidebar-active hover:text-sidebar-foreground"
                 : "btn-ghost -mr-2 -mt-1",

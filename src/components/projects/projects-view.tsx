@@ -38,6 +38,7 @@ function CreateProjectDialog({
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
 
   function handleClose() {
     if (submitting) {
@@ -46,6 +47,7 @@ function CreateProjectDialog({
     setName("");
     setDescription("");
     setError(null);
+    setNameError(null);
     onClose();
   }
 
@@ -53,12 +55,14 @@ function CreateProjectDialog({
     event.preventDefault();
     const trimmedName = name.trim();
     if (!trimmedName) {
-      setError("Enter a project name.");
+      setNameError("Enter a project name.");
+      window.requestAnimationFrame(() => document.getElementById(nameId)?.focus());
       return;
     }
 
     setSubmitting(true);
     setError(null);
+    setNameError(null);
     try {
       const project = await api.createProject({
         name: trimmedName,
@@ -96,15 +100,28 @@ function CreateProjectDialog({
           </Alert>
         ) : null}
 
-        <Field id={nameId} label="Project name" required hint="Up to 120 characters.">
+        <Field
+          id={nameId}
+          label="Project name"
+          required
+          hint="Up to 120 characters."
+          error={nameError ?? undefined}
+        >
           <Input
             id={nameId}
             value={name}
-            onChange={(event) => setName(event.target.value)}
+            onChange={(event) => {
+              setName(event.target.value);
+              if (nameError) {
+                setNameError(null);
+              }
+            }}
             maxLength={120}
             autoComplete="off"
             required
             placeholder="Payments API"
+            aria-invalid={nameError ? true : undefined}
+            aria-describedby={nameError ? `${nameId}-error` : undefined}
           />
         </Field>
 
@@ -321,13 +338,13 @@ function ProjectsBody() {
                       <div className="mt-auto flex flex-wrap gap-2 border-t border-line pt-3 sm:pt-4">
                         <Link
                           href={`/projects/${project.id}`}
-                          className="btn-secondary min-h-9 flex-1 px-3 text-xs"
+                          className="btn-secondary min-h-11 flex-1 px-3 text-xs"
                         >
                           Open project
                         </Link>
                         <Link
                           href={`/contracts?project=${encodeURIComponent(project.id)}`}
-                          className="btn-ghost min-h-9 px-3 text-xs"
+                          className="btn-ghost min-h-11 px-3 text-xs"
                         >
                           Workspace
                         </Link>

@@ -43,10 +43,10 @@ type SummaryCardProps = {
 function SummaryCard({ label, value, className }: SummaryCardProps) {
   return (
     <div className="card p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-subtle">
+      <dt className="text-xs font-medium uppercase tracking-wide text-subtle">
         {label}
-      </p>
-      <p className={`mt-1 text-2xl font-bold ${className}`}>{value}</p>
+      </dt>
+      <dd className={`mt-1 text-2xl font-bold ${className}`}>{value}</dd>
     </div>
   );
 }
@@ -75,6 +75,129 @@ function matchesQuery(finding: FindingDto, query: string): boolean {
     finding.after,
     CATEGORY_LABELS[finding.category],
   ].some((value) => typeof value === "string" && value.toLowerCase().includes(query));
+}
+
+function FindingDetails({ finding }: { finding: FindingDto }) {
+  return (
+    <div className="space-y-3">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-subtle">
+          Explanation
+        </p>
+        <p className="mt-1 text-sm text-muted">{finding.explanation}</p>
+      </div>
+
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-subtle">
+          Evidence location
+        </p>
+        <p className="mt-1 break-all font-mono text-xs text-muted">{finding.location}</p>
+      </div>
+
+      {finding.before !== undefined || finding.after !== undefined ? (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {finding.before !== undefined && finding.before !== null ? (
+            <div className="rounded-md border border-danger/20 bg-danger-light/60 p-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-danger">
+                Before
+              </p>
+              <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all font-mono text-xs text-foreground">
+                {finding.before}
+              </pre>
+            </div>
+          ) : null}
+          {finding.after !== undefined && finding.after !== null ? (
+            <div className="rounded-md border border-success/20 bg-success-light/60 p-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-success">
+                After
+              </p>
+              <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all font-mono text-xs text-foreground">
+                {finding.after}
+              </pre>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function FindingCard({
+  finding,
+  expanded,
+  detailId,
+  onToggle,
+}: {
+  finding: FindingDto;
+  expanded: boolean;
+  detailId: string;
+  onToggle: () => void;
+}) {
+  return (
+    <li className="rounded-lg border border-line bg-surface p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={`badge ${RISK_BADGE_CLASSES[finding.risk]}`}>
+          {RISK_LABELS[finding.risk]}
+        </span>
+        <span
+          className={`text-xs font-semibold ${CHANGE_TYPE_CLASSES[finding.changeType]}`}
+        >
+          {CHANGE_TYPE_LABELS[finding.changeType]}
+        </span>
+      </div>
+
+      <p className="mt-3 text-sm font-medium text-foreground">{finding.summary}</p>
+
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        {finding.method ? (
+          <span
+            className={`inline-flex items-center rounded px-2 py-0.5 text-[11px] font-bold uppercase ${methodClass(finding.method)}`}
+          >
+            {finding.method}
+          </span>
+        ) : null}
+        <span className="break-all font-mono text-xs text-foreground">
+          {finding.path ?? "—"}
+        </span>
+      </div>
+
+      {finding.operationId ? (
+        <p className="mt-1 break-all font-mono text-[11px] text-subtle">
+          operationId {finding.operationId}
+        </p>
+      ) : null}
+
+      <dl className="mt-3 grid gap-2 text-xs">
+        <div>
+          <dt className="text-subtle">Category</dt>
+          <dd className="mt-0.5 text-foreground">{CATEGORY_LABELS[finding.category]}</dd>
+        </div>
+        <div>
+          <dt className="text-subtle">Evidence</dt>
+          <dd className="mt-0.5 break-all font-mono text-[11px] text-muted">
+            {finding.location}
+          </dd>
+        </div>
+      </dl>
+
+      <button
+        type="button"
+        className="btn-secondary mt-3 w-full text-xs sm:w-auto"
+        aria-expanded={expanded}
+        aria-controls={detailId}
+        aria-label={`${expanded ? "Hide" : "Show"} details for ${finding.summary}`}
+        onClick={onToggle}
+      >
+        {expanded ? "Hide details" : "Show details"}
+      </button>
+
+      {expanded ? (
+        <div id={detailId} className="mt-3 border-t border-line pt-3">
+          <FindingDetails finding={finding} />
+        </div>
+      ) : null}
+    </li>
+  );
 }
 
 export default function ComparisonResults({ analysis }: { analysis: AnalysisRunDetailDto }) {
@@ -138,14 +261,14 @@ export default function ComparisonResults({ analysis }: { analysis: AnalysisRunD
     <section id="comparison-report" className="scroll-mt-24 space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold text-foreground">
+          <h2 className="text-lg font-semibold text-foreground">
             Comparison report
             {analysis.label ? (
               <span className="ml-2 text-sm font-normal text-subtle">
                 {analysis.label}
               </span>
             ) : null}
-          </h3>
+          </h2>
           <p className="mt-1 text-xs text-subtle">
             {new Date(analysis.createdAt).toLocaleString()} · {analysis.durationMs} ms
           </p>
@@ -205,7 +328,7 @@ export default function ComparisonResults({ analysis }: { analysis: AnalysisRunD
 
       {analysis.limitations.length > 0 ? (
         <details className="card p-4 text-sm">
-          <summary className="cursor-pointer font-semibold text-foreground">
+          <summary className="min-h-11 cursor-pointer py-2 font-semibold text-foreground">
             Analysis limitations ({analysis.limitations.length})
           </summary>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-muted">
@@ -301,7 +424,7 @@ export default function ComparisonResults({ analysis }: { analysis: AnalysisRunD
             {activeFilters ? (
               <button
                 type="button"
-                className="text-xs font-semibold text-primary underline-offset-2 hover:underline"
+                className="inline-flex min-h-11 items-center text-xs font-semibold text-primary underline-offset-2 hover:underline"
                 onClick={clearFilters}
               >
                 Clear filters
@@ -314,7 +437,7 @@ export default function ComparisonResults({ analysis }: { analysis: AnalysisRunD
               <p>No findings match the current filters.</p>
               <button
                 type="button"
-                className="mt-2 text-xs font-semibold text-primary underline-offset-2 hover:underline"
+                className="mt-2 inline-flex min-h-11 items-center text-xs font-semibold text-primary underline-offset-2 hover:underline"
                 onClick={clearFilters}
               >
                 Clear filters
@@ -322,7 +445,28 @@ export default function ComparisonResults({ analysis }: { analysis: AnalysisRunD
             </div>
           ) : (
             <>
-              <div className="contain-paint overflow-x-auto rounded-lg border border-line">
+              <ul className="space-y-3 lg:hidden" aria-label="Findings">
+                {visibleFindings.map((finding) => {
+                  const expanded = expandedId === finding.id;
+                  const detailId = `finding-card-detail-${finding.id}`;
+                  return (
+                    <FindingCard
+                      key={finding.id}
+                      finding={finding}
+                      expanded={expanded}
+                      detailId={detailId}
+                      onToggle={() => setExpandedId(expanded ? null : finding.id)}
+                    />
+                  );
+                })}
+              </ul>
+
+              <div
+                role="region"
+                aria-label="Findings table, horizontally scrollable"
+                tabIndex={0}
+                className="contain-paint hidden overflow-x-auto rounded-lg border border-line lg:block"
+              >
                 <table className="w-full min-w-[920px] border-collapse text-left text-sm">
                   <caption className="sr-only">
                     Classified differences between the baseline and candidate contracts.
@@ -401,9 +545,9 @@ export default function ComparisonResults({ analysis }: { analysis: AnalysisRunD
                             <td className="px-3 py-2.5">
                               <button
                                 type="button"
-                                className="btn-ghost px-2 py-1 text-xs"
+                                className="btn-ghost min-h-11 px-2 py-1 text-xs"
                                 aria-expanded={expanded}
-                                aria-controls={`finding-detail-${finding.id}`}
+                                aria-controls={`finding-table-detail-${finding.id}`}
                                 aria-label={`${expanded ? "Hide" : "Show"} details for ${finding.summary}`}
                                 onClick={() => setExpandedId(expanded ? null : finding.id)}
                               >
@@ -412,52 +556,12 @@ export default function ComparisonResults({ analysis }: { analysis: AnalysisRunD
                             </td>
                           </tr>
                           {expanded ? (
-                            <tr id={`finding-detail-${finding.id}`} className="bg-surface-muted/80">
+                            <tr
+                              id={`finding-table-detail-${finding.id}`}
+                              className="bg-surface-muted/80"
+                            >
                               <td colSpan={8} className="px-3 py-4">
-                                <div className="space-y-3">
-                                  <div>
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-subtle">
-                                      Explanation
-                                    </p>
-                                    <p className="mt-1 text-sm text-muted">
-                                      {finding.explanation}
-                                    </p>
-                                  </div>
-
-                                  <div>
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-subtle">
-                                      Evidence location
-                                    </p>
-                                    <p className="mt-1 break-all font-mono text-xs text-muted">
-                                      {finding.location}
-                                    </p>
-                                  </div>
-
-                                  {finding.before !== undefined || finding.after !== undefined ? (
-                                    <div className="grid gap-2 sm:grid-cols-2">
-                                      {finding.before !== undefined && finding.before !== null ? (
-                                        <div className="rounded-md border border-danger/20 bg-danger-light/60 p-2">
-                                          <p className="text-[11px] font-semibold uppercase tracking-wide text-danger">
-                                            Before
-                                          </p>
-                                          <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all font-mono text-xs text-foreground">
-                                            {finding.before}
-                                          </pre>
-                                        </div>
-                                      ) : null}
-                                      {finding.after !== undefined && finding.after !== null ? (
-                                        <div className="rounded-md border border-success/20 bg-success-light/60 p-2">
-                                          <p className="text-[11px] font-semibold uppercase tracking-wide text-success">
-                                            After
-                                          </p>
-                                          <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all font-mono text-xs text-foreground">
-                                            {finding.after}
-                                          </pre>
-                                        </div>
-                                      ) : null}
-                                    </div>
-                                  ) : null}
-                                </div>
+                                <FindingDetails finding={finding} />
                               </td>
                             </tr>
                           ) : null}
@@ -471,7 +575,7 @@ export default function ComparisonResults({ analysis }: { analysis: AnalysisRunD
               {hasMore ? (
                 <button
                   type="button"
-                  className="btn-secondary"
+                  className="btn-secondary w-full sm:w-auto"
                   onClick={() => setVisibleCount((current) => current + INITIAL_VISIBLE_FINDINGS)}
                 >
                   Show {Math.min(INITIAL_VISIBLE_FINDINGS, filteredFindings.length - visibleFindings.length)} more

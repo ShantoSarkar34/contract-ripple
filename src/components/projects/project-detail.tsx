@@ -49,6 +49,7 @@ function CreateContractDialog({
   const [name, setName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
 
   function handleClose() {
     if (submitting) {
@@ -56,6 +57,7 @@ function CreateContractDialog({
     }
     setName("");
     setError(null);
+    setNameError(null);
     onClose();
   }
 
@@ -63,12 +65,14 @@ function CreateContractDialog({
     event.preventDefault();
     const trimmedName = name.trim();
     if (!trimmedName) {
-      setError("Enter a contract name.");
+      setNameError("Enter a contract name.");
+      window.requestAnimationFrame(() => document.getElementById(nameId)?.focus());
       return;
     }
 
     setSubmitting(true);
     setError(null);
+    setNameError(null);
     try {
       const contract = await api.createContract(projectId, { name: trimmedName });
       onCreated(contract);
@@ -103,15 +107,28 @@ function CreateContractDialog({
           </Alert>
         ) : null}
 
-        <Field id={nameId} label="Contract name" required hint="Up to 200 characters.">
+        <Field
+          id={nameId}
+          label="Contract name"
+          required
+          hint="Up to 200 characters."
+          error={nameError ?? undefined}
+        >
           <Input
             id={nameId}
             value={name}
-            onChange={(event) => setName(event.target.value)}
+            onChange={(event) => {
+              setName(event.target.value);
+              if (nameError) {
+                setNameError(null);
+              }
+            }}
             maxLength={200}
             autoComplete="off"
             required
             placeholder="Payments API"
+            aria-invalid={nameError ? true : undefined}
+            aria-describedby={nameError ? `${nameId}-error` : undefined}
           />
         </Field>
       </form>
@@ -345,7 +362,7 @@ function ProjectDetailBody({ projectId }: { projectId: string }) {
               </div>
               <button
                 type="button"
-                className="btn-ghost min-h-9 px-3 text-xs"
+                className="btn-ghost min-h-11 px-3 text-xs"
                 onClick={() => setCreateOpen(true)}
               >
                 Add contract
@@ -388,13 +405,13 @@ function ProjectDetailBody({ projectId }: { projectId: string }) {
                     <div className="mt-auto flex flex-wrap gap-2 border-t border-line pt-3 sm:pt-4">
                       <Link
                         href={`/contracts/${contract.id}`}
-                        className="btn-secondary min-h-9 flex-1 px-3 text-xs"
+                        className="btn-secondary min-h-11 flex-1 px-3 text-xs"
                       >
                         View versions
                       </Link>
                       <Link
                         href={`${workspaceHref}&contract=${encodeURIComponent(contract.id)}`}
-                        className="btn-ghost min-h-9 px-3 text-xs"
+                        className="btn-ghost min-h-11 px-3 text-xs"
                       >
                         Upload
                       </Link>

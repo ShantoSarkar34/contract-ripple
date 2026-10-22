@@ -291,7 +291,7 @@ function ContractDetailBody({ contractId }: { contractId: string }) {
 
                     {version.warnings.length > 0 ? (
                       <details className="mt-4 rounded-lg border border-warning/25 bg-warning-light p-3 text-xs text-foreground">
-                        <summary className="cursor-pointer font-semibold text-warning">
+                        <summary className="min-h-11 cursor-pointer py-2 font-semibold text-warning">
                           Parser warnings ({version.warnings.length})
                         </summary>
                         <ul className="mt-2 list-disc space-y-1 pl-5">

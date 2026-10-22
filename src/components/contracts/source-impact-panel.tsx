@@ -70,10 +70,10 @@ function ImpactRow({ impact }: { impact: SourceImpactDto }) {
         >
           {impact.matchedMethod}
         </span>
-        <span className="font-mono text-sm font-semibold text-foreground">
+        <span className="break-all font-mono text-sm font-semibold text-foreground">
           {impact.matchedPath}
         </span>
-        <span className="text-xs text-subtle">
+        <span className="break-all text-xs text-subtle">
           call path <span className="font-mono">{impact.path}</span>
         </span>
         <span
@@ -91,7 +91,11 @@ function ImpactRow({ impact }: { impact: SourceImpactDto }) {
         ) : null}
         line {impact.line}, column {impact.column}
       </p>
-      <pre className="mt-2 overflow-x-auto rounded bg-surface-muted p-2 font-mono text-xs text-foreground">
+      <pre
+        tabIndex={0}
+        aria-label="Source evidence snippet"
+        className="mt-2 overflow-x-auto rounded bg-surface-muted p-2 font-mono text-xs text-foreground"
+      >
         {impact.snippet}
       </pre>
       <p className="mt-2 text-xs text-subtle">{impact.evidence}</p>
@@ -268,7 +272,7 @@ export default function SourceImpactPanel({
             ref={fileInputRef}
             type="file"
             accept=".zip,application/zip"
-            className="mt-3 block w-full text-sm text-muted file:mr-3 file:rounded-md file:border-0 file:bg-secondary-light file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-foreground"
+            className="mt-3 block min-h-11 w-full text-sm text-muted file:mr-3 file:min-h-11 file:rounded-md file:border-0 file:bg-secondary-light file:px-3 file:py-2 file:text-sm file:font-medium file:text-foreground"
             aria-label="Source ZIP archive"
             onChange={(event) => setZipFile(event.target.files?.[0] ?? null)}
           />
@@ -329,7 +333,10 @@ export default function SourceImpactPanel({
       </div>
 
       {error ? (
-        <div className="mt-4 rounded-md border border-danger/30 bg-danger-light p-3 text-sm text-danger">
+        <div
+          role="alert"
+          className="mt-4 rounded-md border border-danger/30 bg-danger-light p-3 text-sm text-danger"
+        >
           <p className="font-medium">{error.message}</p>
           {error.details.length > 0 ? (
             <ul className="mt-1 list-disc space-y-0.5 pl-5">
@@ -423,7 +430,7 @@ export default function SourceImpactPanel({
 
             {active.limitations.length > 0 ? (
               <details className="rounded-md border border-line p-3 text-sm">
-                <summary className="cursor-pointer font-medium text-foreground">
+                <summary className="min-h-11 cursor-pointer py-2 font-medium text-foreground">
                   Analysis limitations
                 </summary>
                 <ul className="mt-2 list-disc space-y-1 pl-5 text-muted">

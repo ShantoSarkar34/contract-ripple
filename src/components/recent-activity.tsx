@@ -45,7 +45,12 @@ export default function RecentActivity() {
         </div>
 
         <div className="card overflow-hidden">
-          <div className="overflow-x-auto">
+          <div
+            role="region"
+            aria-label="Demo recent activity table, horizontally scrollable"
+            tabIndex={0}
+            className="overflow-x-auto"
+          >
             <table className="w-full min-w-[34rem] border-collapse text-left">
               <caption className="sr-only">
                 Demo contract review activity. Sample data, not a real analysis.

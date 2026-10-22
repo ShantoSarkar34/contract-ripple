@@ -86,7 +86,7 @@ export default function RegressionSuggestions({
 
               {suggestion.evidence.length > 0 ? (
                 <details className="mt-3 text-sm">
-                  <summary className="cursor-pointer text-xs font-semibold text-primary">
+                  <summary className="min-h-11 cursor-pointer py-2 text-xs font-semibold text-primary">
                     Evidence from {suggestion.findingIds.length} finding
                     {suggestion.findingIds.length === 1 ? "" : "s"}
                   </summary>

@@ -2,7 +2,10 @@
 
 Stage 2 of the product redesign introduced a shared token layer, UI primitives, and three route-group
 shells. Stage 3 added the authenticated dashboard; Stage 4 added the project, contract, analysis, and
-history views. This document is the reference for the remaining stages so new views stay consistent.
+history views. Stage 5 added the responsive table/card layouts, touch-sized controls, form-error
+associations, skip-link focus targets, and a visual-only impact map backed by an accessible
+relationships table. This document is the reference for the remaining stages so new views stay
+consistent.
 
 ## Tokens
 
@@ -58,8 +61,9 @@ scheme.
 - Auth: centered `max-w-6xl` grid; on mobile the form appears before the explanatory column.
 - Workspace: fixed 256 px sidebar from `lg`; sticky 64 px top bar; content pages own their padding
   (`px-4 py-8 md:px-6 lg:px-8`). Sticky sub-bars inside the workspace use `top-16`.
-- Never allow page-level horizontal scrolling. Wide tables get an `overflow-x-auto` wrapper with a
-  minimum width; mobile card lists replace them in later stages.
+- Never allow page-level horizontal scrolling. Wide technical tables get a focusable
+  `overflow-x-auto` wrapper with a minimum width. The findings and impact-relationship tables become
+  stacked cards below `lg`; the summary cards, project lists, and history rows are already cards.
 - Dashboard: stats use a 2-up grid below `lg` and 4-up above; the project grid is 2-up from `sm`. The
   risk/count side rail moves below the projects until `xl`, where it becomes a 19rem column. This
   avoids squeezing project cards when the 256 px sidebar and side rail are both present.
@@ -129,16 +133,25 @@ and `.skeleton` remain supported and now use the tokens.
 ## Accessibility checklist
 
 - One `h1` per page; sections use `h2`, cards use `h3`.
-- Every form control has a `<label>`; errors are linked with `aria-describedby`/`aria-invalid`.
-- Interactive targets are at least 44×44 px on touch layouts.
-- Focus is always visible; the global `:focus-visible` outline uses `--focus-rgb`.
+- Every form control has a `<label>`; errors are linked with `aria-describedby`/`aria-invalid`, and
+  invalid submit focuses the first invalid field.
+- Interactive controls are at least 44×44 px. The shared button and input classes use `min-h-11`.
+- Focus is always visible; the global `:focus-visible` outline uses `--focus-rgb`. The skip link
+  targets a `tabIndex={-1}` `<main>` so keyboard focus moves into the page.
 - Loading states use `role="status"`; errors use `role="alert"`.
-- Tables need a `<caption>` (visible or `sr-only`); wide tables must scroll rather than clip.
+- Tables need a `<caption>` (visible or `sr-only`); wide tables must scroll rather than clip and the
+  scroll wrapper is keyboard-focusable.
+- The impact-map SVG is visual only and hidden from assistive technology. The Relationships view is
+  the equivalent keyboard- and screen-reader-accessible table with the same evidence; pointer users
+  can still select map nodes for the inline detail panel.
 - Motion respects `prefers-reduced-motion`.
 - Dialogs and drawers must trap focus, close on Escape, and return focus to the trigger.
 
 ## Verification
 
-Responsive checks use a fixed-width iframe harness at 320, 375, 390, 430, 768, 1024, 1280, and
-1440 px, measuring `documentElement.scrollWidth - innerWidth` for each route. Lighthouse is run
-against the marketing page and login.
+Responsive checks use Chrome DevTools device-metrics emulation at 320, 375, 390, 430, 768, 1024,
+1280, and 1440 px, measuring `documentElement.scrollWidth - clientWidth` for each route. The Stage 5
+pass used the temporary mock API described in the phase report and checked the mobile card layouts,
+sticky navigation, download controls, form errors, keyboard focus, and light/dark themes. Lighthouse
+snapshot audits of the marketing, login, workspace, and saved-analysis views returned 100 for
+accessibility. The frontend still has no automated browser suite; these checks are manual.
