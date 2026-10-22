@@ -31,7 +31,10 @@ function toSubmitError(error: unknown): SubmitError {
 
 function ErrorNotice({ error, onRetry }: { error: SubmitError; onRetry?: () => void }) {
   return (
-    <div className="rounded-md border border-danger/30 bg-danger-light p-3 text-sm text-danger">
+    <div
+      role="alert"
+      className="rounded-md border border-danger/30 bg-danger-light p-3 text-sm text-danger"
+    >
       <p className="font-medium">{error.message}</p>
       {error.details.length > 0 ? (
         <ul className="mt-1 list-disc space-y-0.5 pl-5">
@@ -601,7 +604,7 @@ export default function ContractsWorkspace({
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
+      <div className="grid gap-6 xl:grid-cols-[20rem_1fr]">
         <aside className="space-y-6">
           <section className="card p-4">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-subtle">
@@ -652,6 +655,8 @@ export default function ContractsWorkspace({
                   }
                 }}
                 aria-label="New project name"
+                aria-invalid={projectError ? true : undefined}
+                aria-describedby={projectError ? "project-create-error" : undefined}
               />
               <button
                 type="button"
@@ -661,7 +666,11 @@ export default function ContractsWorkspace({
               >
                 {creatingProject ? "Creating…" : "Create project"}
               </button>
-              {projectError ? <ErrorNotice error={projectError} /> : null}
+              {projectError ? (
+                <div id="project-create-error">
+                  <ErrorNotice error={projectError} />
+                </div>
+              ) : null}
             </div>
           </section>
 
@@ -696,7 +705,7 @@ export default function ContractsWorkspace({
                     <button
                       type="button"
                       onClick={() => handleSelectContract(contract.id)}
-                      className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm transition-colors ${
+                      className={`flex min-h-11 w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm transition-colors ${
                         contract.id === selectedContractId
                           ? "bg-primary-light text-primary"
                           : "hover:bg-surface-strong"
@@ -732,6 +741,8 @@ export default function ContractsWorkspace({
                     }
                   }}
                   aria-label="New contract name"
+                  aria-invalid={contractError ? true : undefined}
+                  aria-describedby={contractError ? "contract-create-error" : undefined}
                 />
                 <button
                   type="button"
@@ -741,7 +752,11 @@ export default function ContractsWorkspace({
                 >
                   {creatingContract ? "Creating…" : "Create contract"}
                 </button>
-                {contractError ? <ErrorNotice error={contractError} /> : null}
+                {contractError ? (
+                  <div id="contract-create-error">
+                    <ErrorNotice error={contractError} />
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </section>
@@ -792,7 +807,7 @@ export default function ContractsWorkspace({
                           type="button"
                           onClick={() => void handleOpenAnalysis(run.id)}
                           aria-current={run.id === analysis?.id ? "true" : undefined}
-                          className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-surface-strong ${
+                          className={`min-h-11 w-full rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-surface-strong ${
                             run.id === analysis?.id ? "bg-primary-light text-primary" : ""
                           }`}
                         >
@@ -834,7 +849,7 @@ export default function ContractsWorkspace({
           ) : null}
         </aside>
 
-        <main className="min-w-0 space-y-6">
+        <div className="min-w-0 space-y-6">
           {!selectedContract ? (
             <section className="card p-8 text-center">
               <h2 className="text-lg font-semibold text-foreground">Select a contract</h2>
@@ -949,13 +964,15 @@ export default function ContractsWorkspace({
                       <input
                         type="file"
                         accept=".json,.yaml,.yml,application/json,text/yaml"
-                        className="block w-full text-xs text-subtle"
+                        aria-label="Upload baseline OpenAPI file"
+                        className="block min-h-11 w-full text-xs text-subtle file:mr-2 file:min-h-11 file:rounded-md file:border-0 file:bg-secondary-light file:px-3 file:py-2 file:text-xs file:font-medium file:text-foreground"
                         onChange={(event) => handleFile(event, setBaselineContent)}
                       />
                     </div>
                     <input
                       className="input"
                       placeholder="Label (optional), e.g. v1.4.0"
+                      aria-label="Baseline version label (optional)"
                       value={baselineLabel}
                       onChange={(event) => setBaselineLabel(event.target.value)}
                     />
@@ -979,13 +996,15 @@ export default function ContractsWorkspace({
                       <input
                         type="file"
                         accept=".json,.yaml,.yml,application/json,text/yaml"
-                        className="block w-full text-xs text-subtle"
+                        aria-label="Upload candidate OpenAPI file"
+                        className="block min-h-11 w-full text-xs text-subtle file:mr-2 file:min-h-11 file:rounded-md file:border-0 file:bg-secondary-light file:px-3 file:py-2 file:text-xs file:font-medium file:text-foreground"
                         onChange={(event) => handleFile(event, setCandidateContent)}
                       />
                     </div>
                     <input
                       className="input"
                       placeholder="Label (optional), e.g. v1.5.0"
+                      aria-label="Candidate version label (optional)"
                       value={candidateLabel}
                       onChange={(event) => setCandidateLabel(event.target.value)}
                     />
@@ -1038,7 +1057,7 @@ export default function ContractsWorkspace({
               ) : null}
             </>
           )}
-        </main>
+        </div>
       </div>
     </div>
   );

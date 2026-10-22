@@ -59,7 +59,7 @@ export default function SiteHeader() {
                 href={link.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                  "inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                   active
                     ? "bg-primary-light text-primary"
                     : "text-muted hover:bg-surface-muted hover:text-foreground",
@@ -105,7 +105,7 @@ export default function SiteHeader() {
 
           <button
             type="button"
-            className="btn-ghost min-h-10 min-w-10 px-2 md:hidden"
+            className="btn-ghost min-h-11 min-w-11 px-2 md:hidden"
             aria-expanded={menuOpen}
             aria-controls="mobile-navigation"
             aria-label={menuOpen ? "Close navigation" : "Open navigation"}

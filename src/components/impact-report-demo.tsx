@@ -44,7 +44,12 @@ export default function ImpactReportDemo() {
         </div>
 
         <div className="card overflow-hidden">
-          <div className="overflow-x-auto">
+          <div
+            role="region"
+            aria-label="Demo impact report table, horizontally scrollable"
+            tabIndex={0}
+            className="overflow-x-auto"
+          >
             <table className="w-full min-w-[40rem] border-b border-line text-left">
               <caption className="sr-only">
                 Demo impact report: sample contract changes between two example versions.

@@ -39,7 +39,7 @@ export function Logo({
     <Link
       href={href}
       className={cn(
-        "inline-flex items-center gap-2.5 rounded-lg py-1 transition-opacity hover:opacity-90",
+        "inline-flex items-center gap-2.5 rounded-lg py-1.5 transition-opacity hover:opacity-90",
         className,
       )}
     >

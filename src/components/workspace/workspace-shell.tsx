@@ -312,7 +312,7 @@ export default function WorkspaceShell({ children }: { children: React.ReactNode
         <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-line bg-background/90 px-4 backdrop-blur md:px-6">
           <button
             type="button"
-            className="btn-ghost min-h-10 min-w-10 px-2 lg:hidden"
+            className="btn-ghost min-h-11 min-w-11 px-2 lg:hidden"
             aria-expanded={drawerOpen}
             aria-controls="workspace-mobile-navigation"
             aria-label={drawerOpen ? "Close navigation" : "Open navigation"}
@@ -367,7 +367,11 @@ export default function WorkspaceShell({ children }: { children: React.ReactNode
           </div>
         </header>
 
-        <main id="main-content" className="min-h-[calc(100vh-4rem)]">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="min-h-[calc(100vh-4rem)] focus:outline-none"
+        >
           {children}
         </main>
       </div>

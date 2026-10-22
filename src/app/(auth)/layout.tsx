@@ -31,7 +31,11 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </div>
       </header>
 
-      <main id="main-content" className="flex flex-1 items-center py-8 sm:py-12">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="flex flex-1 items-center py-8 focus:outline-none sm:py-12"
+      >
         {children}
       </main>
     </div>

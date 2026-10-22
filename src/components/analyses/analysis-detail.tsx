@@ -321,19 +321,19 @@ function AnalysisDetailBody({ analysisId }: { analysisId: string }) {
       >
         <a
           href="#comparison-report"
-          className="shrink-0 rounded-lg px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-strong hover:text-foreground"
+          className="inline-flex min-h-11 shrink-0 items-center rounded-lg px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-strong hover:text-foreground"
         >
           Findings
         </a>
         <a
           href="#impact-map"
-          className="shrink-0 rounded-lg px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-strong hover:text-foreground"
+          className="inline-flex min-h-11 shrink-0 items-center rounded-lg px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-strong hover:text-foreground"
         >
           Source impact
         </a>
         <a
           href="#regression-suggestions"
-          className="shrink-0 rounded-lg px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-strong hover:text-foreground"
+          className="inline-flex min-h-11 shrink-0 items-center rounded-lg px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-strong hover:text-foreground"
         >
           Regression checks
         </a>
