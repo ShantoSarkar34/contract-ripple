@@ -121,7 +121,7 @@ function CreateProjectDialog({
             required
             placeholder="Payments API"
             aria-invalid={nameError ? true : undefined}
-            aria-describedby={nameError ? `${nameId}-error` : undefined}
+            aria-describedby={nameError ? `${nameId}-error` : `${nameId}-hint`}
           />
         </Field>
 
@@ -136,6 +136,7 @@ function CreateProjectDialog({
             onChange={(event) => setDescription(event.target.value)}
             maxLength={2000}
             placeholder="Customer-facing payments surface and its integration contracts."
+            aria-describedby={`${descriptionId}-hint`}
           />
         </Field>
       </form>

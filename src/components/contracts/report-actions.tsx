@@ -60,6 +60,7 @@ export default function ReportActions({ analysis }: { analysis: AnalysisRunDetai
           className="btn-secondary px-3 py-1.5 text-xs"
           disabled={pending !== null}
           onClick={() => void handleExport("json")}
+          aria-label="Download JSON report"
         >
           {pending === "json" ? "Preparing…" : "JSON"}
         </button>
@@ -68,6 +69,7 @@ export default function ReportActions({ analysis }: { analysis: AnalysisRunDetai
           className="btn-secondary px-3 py-1.5 text-xs"
           disabled={pending !== null}
           onClick={() => void handleExport("markdown")}
+          aria-label="Download Markdown report"
         >
           {pending === "markdown" ? "Preparing…" : "Markdown"}
         </button>

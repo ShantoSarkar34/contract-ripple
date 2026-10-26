@@ -1,23 +1,34 @@
 # ContractRipple — Architecture
 
-## Current state (Phase 6)
+## Current state (Phase 8, Stage 6)
 
 The repository contains one Next.js application at the repository root, an
 Express API with persistence, a shared types/schemas package, a standalone
 OpenAPI comparison engine, a source-analysis package, and a standalone impact
-graph builder. The `/contracts` route is wired to the real API and database;
-source analysis (ZIP and GitHub) is available for a comparison, and the
-source-impact panel renders an evidence-backed operation→file map with a
-filterable findings table and an accessible relationships view. Saved history
-is cursor-paginated, comparisons can be downloaded as JSON or Markdown, and
-operation-scoped regression suggestions are derived from persisted findings.
-The marketing page (`/`) still renders clearly labeled demo content.
+graph builder. The authenticated workspace is wired to the real API and
+database:
+
+- `/dashboard` summarizes the owner's projects and latest persisted analyses.
+- `/projects` and `/projects/[projectId]` manage projects, contracts, and their
+  saved analyses.
+- `/contracts` runs comparisons and source analysis; `/contracts/[contractId]`
+  shows immutable versions and related runs.
+- `/history` browses saved analyses across projects or within one project.
+- `/analyses/[analysisId]` is the read-only persisted run view with findings,
+  source impact, report downloads, and regression suggestions.
+
+Source-analysis history is evidence-backed, findings are filterable, the impact
+map has an accessible relationships view, and regression suggestions are derived
+from persisted findings. Authentication uses server-side sessions and ownership
+checks. The marketing page (`/`) still renders clearly labeled demo content.
 
 ```
 contract-ripple/            # git repo root
 ├── src/app/                # Next.js App Router (frontend)
-│   └── contracts/          # real workspace (client component)
-├── src/components/         # presentation components (demo + contracts workspace)
+│   ├── (marketing)/        # public landing page
+│   ├── (auth)/             # sign-in / registration
+│   └── (workspace)/        # authenticated dashboard, projects, contracts, history, analyses
+├── src/components/         # route-group views, UI primitives, and demo sections
 ├── src/lib/                # frontend API client and view helpers
 ├── apps/api/               # Express API (routes, services, repositories)
 │   ├── src/services/       # comparison, source, report, and regression-tests logic

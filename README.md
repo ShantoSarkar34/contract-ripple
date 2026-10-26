@@ -5,16 +5,17 @@ potential impact on frontend integrations. It compares OpenAPI specifications, c
 potentially breaking changes, analyzes frontend source code for affected calls, and visualizes
 the evidence-backed relationships.
 
-> **Status:** Phase 7. The OpenAPI engine is wired to an Express API with
-> PostgreSQL persistence, and the `/contracts` workspace runs real comparisons,
-> shows classified findings in a filterable table with JSON Pointer evidence,
-> analyzes ZIP/GitHub source for affected integrations with file/line evidence,
-> renders an evidence-backed operation→file impact graph with an accessible
-> relationships view, paginates saved history, downloads JSON/Markdown reports,
-> and derives regression review prompts from persisted findings. Phase 7 adds
-> email/password authentication with database-backed sessions, CSRF protection,
-> server-side project ownership checks, security headers, and database-backed
-> rate limits. The landing page (`/`) still renders clearly labeled demo content.
+> **Status:** Phase 8, Stage 6. The OpenAPI engine is wired to an Express API
+> with PostgreSQL persistence. The authenticated workspace includes a dashboard,
+> project and contract views, a real comparison workspace, saved history, and
+> read-only analysis pages. Comparisons show classified findings with JSON
+> Pointer evidence, ZIP/GitHub source analysis with file/line evidence, an
+> evidence-backed operation→file impact graph with an accessible relationships
+> view, JSON/Markdown report downloads, and regression review prompts derived
+> from persisted findings. Phase 7 added email/password authentication with
+> database-backed sessions, CSRF protection, server-side project ownership
+> checks, security headers, and database-backed rate limits. The landing page
+> (`/`) still renders clearly labeled demo content.
 
 ## Stack
 
@@ -99,7 +100,7 @@ before deploying.
 ## Run
 
 ```bash
-# Frontend → http://localhost:3000  (sign in at /login, workspace at /contracts)
+# Frontend → http://localhost:3000  (sign in at /login; then /dashboard)
 npm run dev
 
 # API → http://localhost:4000/api/v1/health

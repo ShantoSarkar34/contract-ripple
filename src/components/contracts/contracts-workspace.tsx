@@ -9,6 +9,7 @@ import type {
   ProjectDto,
 } from "@contract-ripple/shared";
 import { API_BASE_URL, ApiRequestError, api, describeErrorDetails } from "@/lib/api";
+import { formatBytes } from "@/lib/format";
 import ComparisonResults from "./comparison-results";
 import RegressionSuggestions from "./regression-suggestions";
 import SourceImpactPanel from "./source-impact-panel";
@@ -117,11 +118,31 @@ export default function ContractsWorkspace({
       setProjects(response.projects);
       setProjectsState("ready");
       setProjectsError(null);
-      setSelectedProjectId((current) =>
+      const current = selectedProjectRef.current;
+      const next =
         current && response.projects.some((project) => project.id === current)
           ? current
-          : (response.projects[0]?.id ?? ""),
-      );
+          : (response.projects[0]?.id ?? "");
+      if (next !== current) {
+        selectedProjectRef.current = next;
+        setAnalysis(null);
+        setContracts([]);
+        setContractsState("loading");
+        setContractsError(null);
+        setSelectedContractId("");
+        setVersions([]);
+        setVersionsState("idle");
+        setVersionsError(null);
+        setBaselineVersionId("");
+        setCandidateVersionId("");
+        setHistoryState("loading");
+        setHistory([]);
+        setHistoryTotal(0);
+        setHistoryNextCursor(null);
+        setHistoryError(null);
+        setHistoryLoadingMore(false);
+      }
+      setSelectedProjectId(next);
     } catch (error) {
       setProjectsError(toSubmitError(error));
       setProjectsState("error");
@@ -129,19 +150,31 @@ export default function ContractsWorkspace({
   }
 
   async function reloadContracts(projectId: string): Promise<void> {
+    setContractsState("loading");
+    setContractsError(null);
+    setContracts([]);
     try {
       const response = await api.listContracts(projectId);
+      if (selectedProjectRef.current !== projectId) {
+        return;
+      }
       setContracts(response.contracts);
       setContractsState("ready");
-      setContractsError(null);
       setSelectedContractId((current) => nextContractId(response.contracts, current));
     } catch (error) {
+      if (selectedProjectRef.current !== projectId) {
+        return;
+      }
+      setContracts([]);
+      setSelectedContractId("");
       setContractsError(toSubmitError(error));
       setContractsState("error");
     }
   }
 
   async function reloadVersions(contractId: string): Promise<void> {
+    setVersionsState("loading");
+    setVersionsError(null);
     try {
       const response = await api.listVersions(contractId);
       setVersions(response.versions);
@@ -234,6 +267,7 @@ export default function ContractsWorkspace({
     if (!selectedProjectId) {
       return;
     }
+    selectedProjectRef.current = selectedProjectId;
     let cancelled = false;
 
     void (async () => {
@@ -250,6 +284,8 @@ export default function ContractsWorkspace({
         if (cancelled) {
           return;
         }
+        setContracts([]);
+        setSelectedContractId("");
         setContractsError(toSubmitError(error));
         setContractsState("error");
       }
@@ -307,6 +343,9 @@ export default function ContractsWorkspace({
         if (cancelled) {
           return;
         }
+        setVersions([]);
+        setBaselineVersionId("");
+        setCandidateVersionId("");
         setVersionsError(toSubmitError(error));
         setVersionsState("error");
       }
@@ -321,10 +360,19 @@ export default function ContractsWorkspace({
   const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null;
 
   function handleSelectProject(projectId: string) {
+    selectedProjectRef.current = projectId;
     setSelectedProjectId(projectId);
     setAnalysis(null);
     setSubmitError(null);
+    setContracts([]);
     setContractsState("loading");
+    setContractsError(null);
+    setSelectedContractId("");
+    setVersions([]);
+    setVersionsState("idle");
+    setVersionsError(null);
+    setBaselineVersionId("");
+    setCandidateVersionId("");
     setHistoryState("loading");
     setHistory([]);
     setHistoryTotal(0);
@@ -337,7 +385,11 @@ export default function ContractsWorkspace({
     setSelectedContractId(contractId);
     setAnalysis(null);
     setSubmitError(null);
+    setVersions([]);
     setVersionsState("loading");
+    setVersionsError(null);
+    setBaselineVersionId("");
+    setCandidateVersionId("");
   }
 
   async function handleCreateProject() {
@@ -352,13 +404,22 @@ export default function ContractsWorkspace({
       setNewProjectName("");
       await reloadProjects();
       setAnalysis(null);
+      setContracts([]);
       setContractsState("loading");
+      setContractsError(null);
+      setSelectedContractId("");
+      setVersions([]);
+      setVersionsState("idle");
+      setVersionsError(null);
+      setBaselineVersionId("");
+      setCandidateVersionId("");
       setHistoryState("loading");
       setHistory([]);
       setHistoryTotal(0);
       setHistoryNextCursor(null);
       setHistoryError(null);
       setHistoryLoadingMore(false);
+      selectedProjectRef.current = project.id;
       setSelectedProjectId(project.id);
     } catch (error) {
       setProjectError(toSubmitError(error));
@@ -379,12 +440,16 @@ export default function ContractsWorkspace({
     setCreatingContract(true);
     setContractError(null);
     setAnalysis(null);
-    setVersionsState("loading");
     try {
       const contract = await api.createContract(selectedProjectId, {
         name: newContractName.trim(),
       });
       setNewContractName("");
+      setVersions([]);
+      setVersionsState("loading");
+      setVersionsError(null);
+      setBaselineVersionId("");
+      setCandidateVersionId("");
       await reloadContracts(selectedProjectId);
       setSelectedContractId(contract.id);
     } catch (error) {
@@ -419,10 +484,13 @@ export default function ContractsWorkspace({
         content: candidateContent,
         label: candidateLabel.trim() || undefined,
       });
+      const combinedLabel = `${baselineLabel.trim() || "baseline"} → ${
+        candidateLabel.trim() || "candidate"
+      }`;
       const result = await api.createComparison(selectedProjectId, {
         baselineVersionId: baseline.id,
         candidateVersionId: candidate.id,
-        label: `${baselineLabel.trim() || "baseline"} → ${candidateLabel.trim() || "candidate"}`,
+        label: combinedLabel.length <= 200 ? combinedLabel : undefined,
       });
 
       setAnalysis(result);
@@ -886,7 +954,7 @@ export default function ContractsWorkspace({
                   </p>
                 ) : null}
 
-                {versions.length > 0 ? (
+                {versionsState === "ready" && versions.length > 0 ? (
                   <>
                     <ul className="mt-3 flex flex-wrap gap-2">
                       {versions.map((version) => (
@@ -899,7 +967,7 @@ export default function ContractsWorkspace({
                           </span>
                           <span className="ml-2 text-subtle">
                             {version.format} · {version.openapiVersion ?? "?"} ·{" "}
-                            {Math.round(version.contentBytes / 1024)} KB
+                            {formatBytes(version.contentBytes)}
                           </span>
                         </li>
                       ))}
@@ -954,28 +1022,25 @@ export default function ContractsWorkspace({
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <div className="space-y-1">
-                      <label
-                        htmlFor="baseline-content"
-                        className="block text-sm font-medium text-foreground"
-                      >
-                        Baseline (before)
-                      </label>
-                      <input
-                        type="file"
-                        accept=".json,.yaml,.yml,application/json,text/yaml"
-                        aria-label="Upload baseline OpenAPI file"
-                        className="block min-h-11 w-full text-xs text-subtle file:mr-2 file:min-h-11 file:rounded-md file:border-0 file:bg-secondary-light file:px-3 file:py-2 file:text-xs file:font-medium file:text-foreground"
-                        onChange={(event) => handleFile(event, setBaselineContent)}
-                      />
-                    </div>
+                    <p className="text-sm font-medium text-foreground">Baseline (before)</p>
+                    <input
+                      type="file"
+                      accept=".json,.yaml,.yml,application/json,text/yaml"
+                      aria-label="Upload baseline OpenAPI file"
+                      className="block min-h-11 w-full text-xs text-subtle file:mr-2 file:min-h-11 file:rounded-md file:border-0 file:bg-secondary-light file:px-3 file:py-2 file:text-xs file:font-medium file:text-foreground"
+                      onChange={(event) => handleFile(event, setBaselineContent)}
+                    />
                     <input
                       className="input"
                       placeholder="Label (optional), e.g. v1.4.0"
                       aria-label="Baseline version label (optional)"
                       value={baselineLabel}
+                      maxLength={120}
                       onChange={(event) => setBaselineLabel(event.target.value)}
                     />
+                    <label htmlFor="baseline-content" className="sr-only">
+                      Baseline OpenAPI content
+                    </label>
                     <textarea
                       id="baseline-content"
                       className="input h-56 resize-y font-mono text-xs"
@@ -986,28 +1051,25 @@ export default function ContractsWorkspace({
                   </div>
 
                   <div className="space-y-2">
-                    <div className="space-y-1">
-                      <label
-                        htmlFor="candidate-content"
-                        className="block text-sm font-medium text-foreground"
-                      >
-                        Candidate (after)
-                      </label>
-                      <input
-                        type="file"
-                        accept=".json,.yaml,.yml,application/json,text/yaml"
-                        aria-label="Upload candidate OpenAPI file"
-                        className="block min-h-11 w-full text-xs text-subtle file:mr-2 file:min-h-11 file:rounded-md file:border-0 file:bg-secondary-light file:px-3 file:py-2 file:text-xs file:font-medium file:text-foreground"
-                        onChange={(event) => handleFile(event, setCandidateContent)}
-                      />
-                    </div>
+                    <p className="text-sm font-medium text-foreground">Candidate (after)</p>
+                    <input
+                      type="file"
+                      accept=".json,.yaml,.yml,application/json,text/yaml"
+                      aria-label="Upload candidate OpenAPI file"
+                      className="block min-h-11 w-full text-xs text-subtle file:mr-2 file:min-h-11 file:rounded-md file:border-0 file:bg-secondary-light file:px-3 file:py-2 file:text-xs file:font-medium file:text-foreground"
+                      onChange={(event) => handleFile(event, setCandidateContent)}
+                    />
                     <input
                       className="input"
                       placeholder="Label (optional), e.g. v1.5.0"
                       aria-label="Candidate version label (optional)"
                       value={candidateLabel}
+                      maxLength={120}
                       onChange={(event) => setCandidateLabel(event.target.value)}
                     />
+                    <label htmlFor="candidate-content" className="sr-only">
+                      Candidate OpenAPI content
+                    </label>
                     <textarea
                       id="candidate-content"
                       className="input h-56 resize-y font-mono text-xs"

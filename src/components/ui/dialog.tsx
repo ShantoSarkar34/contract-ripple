@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
 
 const FOCUSABLE =
@@ -47,6 +48,7 @@ export function Dialog({
   closeLabel?: string;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
   const onCloseRef = useRef(onClose);
 
@@ -69,6 +71,20 @@ export function Dialog({
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+
+    const overlay = overlayRef.current;
+    const siblings = overlay
+      ? Array.from(document.body.children).filter((element) => element !== overlay)
+      : [];
+    const siblingState = siblings.map((element) => ({
+      element,
+      hadInert: element.hasAttribute("inert"),
+      ariaHidden: element.getAttribute("aria-hidden"),
+    }));
+    for (const sibling of siblings) {
+      sibling.setAttribute("inert", "");
+      sibling.setAttribute("aria-hidden", "true");
+    }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -94,10 +110,19 @@ export function Dialog({
       const firstItem = items[0];
       const lastItem = items[items.length - 1];
 
-      if (event.shiftKey && document.activeElement === firstItem) {
+      if (!panelRef.current.contains(document.activeElement)) {
+        event.preventDefault();
+        (event.shiftKey ? lastItem : firstItem).focus();
+      } else if (
+        event.shiftKey &&
+        (document.activeElement === firstItem || document.activeElement === panelRef.current)
+      ) {
         event.preventDefault();
         lastItem.focus();
-      } else if (!event.shiftKey && document.activeElement === lastItem) {
+      } else if (
+        !event.shiftKey &&
+        (document.activeElement === lastItem || document.activeElement === panelRef.current)
+      ) {
         event.preventDefault();
         firstItem.focus();
       }
@@ -107,18 +132,29 @@ export function Dialog({
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = previousOverflow;
+      for (const sibling of siblingState) {
+        if (!sibling.hadInert) {
+          sibling.element.removeAttribute("inert");
+        }
+        if (sibling.ariaHidden === null) {
+          sibling.element.removeAttribute("aria-hidden");
+        } else {
+          sibling.element.setAttribute("aria-hidden", sibling.ariaHidden);
+        }
+      }
       restoreFocusRef.current?.focus?.();
     };
   }, [open]);
 
-  if (!open) {
+  if (!open || typeof document === "undefined") {
     return null;
   }
 
   const isDrawer = placement === "left";
 
-  return (
+  return createPortal(
     <div
+      ref={overlayRef}
       className={cn(
         "fixed inset-0 z-50 flex bg-slate-950/55 backdrop-blur-[2px]",
         isDrawer ? "justify-start" : "items-start justify-center overflow-y-auto p-4 sm:items-center",
@@ -201,6 +237,7 @@ export function Dialog({
           </div>
         ) : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

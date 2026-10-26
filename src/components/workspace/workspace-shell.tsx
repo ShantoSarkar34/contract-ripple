@@ -316,7 +316,7 @@ export default function WorkspaceShell({ children }: { children: React.ReactNode
             aria-expanded={drawerOpen}
             aria-controls="workspace-mobile-navigation"
             aria-label={drawerOpen ? "Close navigation" : "Open navigation"}
-            onClick={() => setDrawerOpen(true)}
+            onClick={() => setDrawerOpen((open) => !open)}
           >
             <svg
               aria-hidden="true"

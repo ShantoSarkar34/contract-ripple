@@ -22,9 +22,11 @@ type LoadState = "loading" | "ready" | "error";
 function AnalysisSidebar({
   analysis,
   project,
+  projectUnavailable,
 }: {
   analysis: AnalysisRunDetailDto;
   project: ProjectDto | null;
+  projectUnavailable: boolean;
 }) {
   const statusTone = analysis.status === "failed" ? "danger" : "success";
   const statusLabel = analysis.status === "failed" ? "Failed" : "Completed";
@@ -49,8 +51,12 @@ function AnalysisSidebar({
                 <Link href={`/projects/${project.id}`} className="link">
                   {project.name}
                 </Link>
-              ) : (
+              ) : projectUnavailable ? (
                 <span className="text-muted">Unavailable</span>
+              ) : (
+                <span className="text-muted" role="status">
+                  Loading…
+                </span>
               )}
             </dd>
           </div>
@@ -350,7 +356,11 @@ function AnalysisDetailBody({ analysisId }: { analysisId: string }) {
           <RegressionSuggestions analysis={analysis} />
         </div>
 
-        <AnalysisSidebar analysis={analysis} project={project} />
+        <AnalysisSidebar
+          analysis={analysis}
+          project={project}
+          projectUnavailable={projectUnavailable}
+        />
       </div>
     </div>
   );
