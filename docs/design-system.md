@@ -4,8 +4,9 @@ Stage 2 of the product redesign introduced a shared token layer, UI primitives, 
 shells. Stage 3 added the authenticated dashboard; Stage 4 added the project, contract, analysis, and
 history views. Stage 5 added the responsive table/card layouts, touch-sized controls, form-error
 associations, skip-link focus targets, and a visual-only impact map backed by an accessible
-relationships table. This document is the reference for the remaining stages so new views stay
-consistent.
+relationships table. Stage 6 completed the final review with stale-state fixes, background isolation
+for dialogs, corrected label/hint associations, and shared size/duration formatters. This document is
+the reference for future work so new views stay consistent.
 
 ## Tokens
 
@@ -145,13 +146,30 @@ and `.skeleton` remain supported and now use the tokens.
   the equivalent keyboard- and screen-reader-accessible table with the same evidence; pointer users
   can still select map nodes for the inline detail panel.
 - Motion respects `prefers-reduced-motion`.
-- Dialogs and drawers must trap focus, close on Escape, and return focus to the trigger.
+- Dialogs and drawers render in a body portal, mark background content `inert`/`aria-hidden`, trap
+  focus (including Shift+Tab from the panel), close on Escape, and return focus to the trigger.
 
 ## Verification
 
 Responsive checks use Chrome DevTools device-metrics emulation at 320, 375, 390, 430, 768, 1024,
 1280, and 1440 px, measuring `documentElement.scrollWidth - clientWidth` for each route. The Stage 5
 pass used the temporary mock API described in the phase report and checked the mobile card layouts,
-sticky navigation, download controls, form errors, keyboard focus, and light/dark themes. Lighthouse
-snapshot audits of the marketing, login, workspace, and saved-analysis views returned 100 for
-accessibility. The frontend still has no automated browser suite; these checks are manual.
+sticky navigation, download controls, form errors, keyboard focus, and light/dark themes.
+
+Stage 6 re-ran the matrix against a production build and the temporary mock API: 10 routes × 8 widths
+= 80 checks covering `/`, signed-out `/login`, `/dashboard`, `/projects`,
+`/projects/project_payments`, `/contracts/contract_payments`, the `/contracts` workspace,
+`/analyses/analysis_payments_3`, `/history`, and project-filtered `/history`. All 80 checks had zero
+page-level horizontal overflow, exactly one visible `main` and `h1`, no visible duplicate IDs, no
+undersized sampled buttons/form controls/link-buttons, and no unexpected runtime errors. The only
+console entry was the expected `401 (Unauthorized)` from signed-out session probing on `/login`.
+Every collected internal link target returned a status below 400. Separate scripted checks confirmed
+that the project dialogs and mobile workspace drawer render in a body portal, apply
+`inert`/`aria-hidden` to background siblings, wrap Shift+Tab inside the panel, close on Escape, and
+return focus to the trigger; switching from Payments Platform to Identity & Access cleared the old
+contracts, versions, and selections before showing the empty state.
+
+Lighthouse audits of the marketing, signed-out login, dashboard, workspace, projects, project
+detail, contract detail, saved-analysis, and history views returned 100 for Accessibility, Best
+Practices, and SEO with no reported failures. The frontend still has no automated browser suite;
+these checks are scripted or manual against the mock API.

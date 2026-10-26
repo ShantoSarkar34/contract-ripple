@@ -10,7 +10,8 @@ recommendations:
 
 - **Application shell:** the workspace now has a sticky context bar showing the selected project,
   contract, and anchors to the comparison report and impact map. The navbar no longer exposes dead
-  `/impact`, `/history`, or `/signup` routes and includes a keyboard-operable mobile menu.
+  `/impact` or `/signup` routes; `/history` is now a real all-projects history route. The header
+  includes a keyboard-operable mobile menu.
 - **Typography:** the Geist font variables loaded by `layout.tsx` are applied to the body, and
   monospace is used for code paths and evidence.
 - **Information density:** comparison findings are a dense, filterable table (risk, category,
@@ -79,9 +80,36 @@ navbar with three purpose-built shells and consolidated the visual system.
 - **Verified:** no page-level horizontal overflow at 320, 375, 390, 430, 768, 1024, 1280, or 1440 px
   on `/`, `/login`, and `/contracts`. Lighthouse accessibility on `/` is 1.00.
 
-Deferred to later stages: authenticated workspace content at viewport widths, mobile card layouts for
-the findings and relationships tables, graph keyboard selection/zoom, per-field validation styling,
-and a manual theme toggle (the product still follows the OS preference).
+Stages 3–5 resolved the remaining layout and form items: authenticated workspace routes, mobile card
+layouts for the findings and relationships tables, and per-field validation associations. Graph
+keyboard selection was intentionally not added: the SVG map is visual-only and hidden from assistive
+technology, while the Relationships table is the equivalent keyboard-accessible view. A manual theme
+toggle is still not required because the product follows the OS preference.
+
+### Stage 6 — final review
+
+The final review checked all redesign stages together and fixed the remaining defects:
+
+- Project and contract switches now clear the previous project's contract and version state before
+  loading, and failed requests no longer leave stale selectors that can submit the wrong version IDs.
+- A failed contract creation no longer leaves the versions panel stuck on "Loading versions…".
+- Source-impact history failures now offer Retry and no longer show a contradictory "no analysis"
+  empty state when snapshot summaries exist.
+- The mobile workspace navigation trigger now toggles, so its accessible name matches its action.
+- Dialogs render in a body portal, mark background content `inert`/`aria-hidden`, and keep Shift+Tab
+  inside the panel.
+- Baseline/candidate content labels are associated with the textareas, version labels enforce the
+  120-character limit, project-form hints are referenced by `aria-describedby`, and report export
+  buttons announce their format.
+- Findings durations and contract sizes use the shared formatters; the analysis sidebar distinguishes
+  a loading project from an unavailable one; the dashboard labels the latest review as partial when
+  only some project histories were loaded.
+
+Verification results are recorded in `docs/design-system.md` and the Stage 6 completion report.
+The final production-build pass checked 80 route/width combinations with no overflow, no broken
+internal links, and one visible main/`h1` per route; dialog and mobile-drawer focus behavior passed,
+and Lighthouse returned 100 for Accessibility, Best Practices, and SEO on nine public and
+authenticated views.
 
 ## Current UI inventory
 

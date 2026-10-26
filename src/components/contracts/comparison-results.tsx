@@ -7,6 +7,7 @@ import type {
   FindingDto,
   RiskLevel,
 } from "@contract-ripple/shared";
+import { formatDuration } from "@/lib/analysis";
 import {
   CATEGORY_LABELS,
   CHANGE_TYPE_CLASSES,
@@ -270,7 +271,8 @@ export default function ComparisonResults({ analysis }: { analysis: AnalysisRunD
             ) : null}
           </h2>
           <p className="mt-1 text-xs text-subtle">
-            {new Date(analysis.createdAt).toLocaleString()} · {analysis.durationMs} ms
+            {new Date(analysis.createdAt).toLocaleString()} ·{" "}
+            {formatDuration(analysis.durationMs)}
           </p>
         </div>
         <ReportActions analysis={analysis} />

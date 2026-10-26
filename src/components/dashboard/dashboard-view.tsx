@@ -189,7 +189,11 @@ function DashboardBody() {
                   {summary.latestAnalysisAt ? formatRelativeTime(summary.latestAnalysisAt) : "—"}
                 </dd>
                 <dd className="mt-1 text-xs text-subtle">
-                  {summary.latestAnalysisAt ? "Saved comparison" : "No analyses yet"}
+                  {summary.latestAnalysisAt
+                    ? summary.partial
+                      ? "Most recent among loaded projects"
+                      : "Saved comparison"
+                    : "No analyses yet"}
                 </dd>
               </div>
             </dl>

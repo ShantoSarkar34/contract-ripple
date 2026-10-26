@@ -128,7 +128,7 @@ function CreateContractDialog({
             required
             placeholder="Payments API"
             aria-invalid={nameError ? true : undefined}
-            aria-describedby={nameError ? `${nameId}-error` : undefined}
+            aria-describedby={nameError ? `${nameId}-error` : `${nameId}-hint`}
           />
         </Field>
       </form>

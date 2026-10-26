@@ -9,6 +9,7 @@ import type {
 } from "@contract-ripple/shared";
 import { ApiRequestError, api, describeErrorDetails } from "@/lib/api";
 import { CONFIDENCE_CLASSES, CONFIDENCE_LABELS, displayPath, methodClass } from "@/lib/findings";
+import { formatBytes } from "@/lib/format";
 import ImpactGraph from "./impact-graph";
 
 /** Local mirror of the server limit; keep the shared package out of the client bundle. */
@@ -42,16 +43,6 @@ function toSnapshotSummary(detail: SourceSnapshotDetailDto): SourceSnapshotDto {
     limitations: detail.limitations,
     createdAt: detail.createdAt,
   };
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) {
-    return `${bytes} B`;
-  }
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KiB`;
-  }
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
 }
 
 function sourceLabel(snapshot: SourceSnapshotDto): string {
@@ -113,6 +104,8 @@ export default function SourceImpactPanel({
   const [githubConfigured, setGithubConfigured] = useState<boolean | null>(null);
   const [snapshots, setSnapshots] = useState<SourceSnapshotDto[]>([]);
   const [snapshotsState, setSnapshotsState] = useState<LoadState>("loading");
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [active, setActive] = useState<SourceSnapshotDetailDto | null>(null);
   const [loadingSnapshot, setLoadingSnapshot] = useState(false);
   const [zipFile, setZipFile] = useState<File | null>(null);
@@ -148,8 +141,10 @@ export default function SourceImpactPanel({
             if (!cancelled) {
               setActive(detail);
             }
-          } catch {
-            // The snapshot list is still useful if one detail request fails.
+          } catch (detailError) {
+            if (!cancelled) {
+              setError(toPanelError(detailError));
+            }
           }
         } else {
           setActive(null);
@@ -157,6 +152,7 @@ export default function SourceImpactPanel({
       } catch (loadError) {
         if (!cancelled) {
           setSnapshotsState("error");
+          setLoadFailed(true);
           setError(toPanelError(loadError));
         }
       }
@@ -165,7 +161,7 @@ export default function SourceImpactPanel({
     return () => {
       cancelled = true;
     };
-  }, [projectId, analysis.id]);
+  }, [projectId, analysis.id, reloadKey]);
 
   function applySnapshot(detail: SourceSnapshotDetailDto): void {
     setActive(detail);
@@ -187,6 +183,7 @@ export default function SourceImpactPanel({
 
     setSubmitting("zip");
     setError(null);
+    setLoadFailed(false);
     try {
       const detail = await api.analyzeZipSource(projectId, zipFile, {
         analysisRunId: analysis.id,
@@ -211,6 +208,7 @@ export default function SourceImpactPanel({
 
     setSubmitting("github");
     setError(null);
+    setLoadFailed(false);
     try {
       const detail = await api.analyzeGithubSource(projectId, {
         repository: repository.trim(),
@@ -236,6 +234,13 @@ export default function SourceImpactPanel({
     } finally {
       setLoadingSnapshot(false);
     }
+  }
+
+  function retrySnapshots(): void {
+    setSnapshotsState("loading");
+    setError(null);
+    setLoadFailed(false);
+    setReloadKey((current) => current + 1);
   }
 
   const groupedImpacts = new Map<string, SourceImpactDto[]>();
@@ -345,6 +350,15 @@ export default function SourceImpactPanel({
               ))}
             </ul>
           ) : null}
+          {loadFailed ? (
+            <button
+              type="button"
+              className="mt-2 text-xs font-semibold underline"
+              onClick={retrySnapshots}
+            >
+              Retry
+            </button>
+          ) : null}
         </div>
       ) : null}
 
@@ -355,11 +369,17 @@ export default function SourceImpactPanel({
           </p>
         ) : null}
 
-        {snapshotsState === "ready" && !active ? (
+        {snapshotsState === "ready" && snapshots.length === 0 ? (
           <div className="rounded-md border border-dashed border-line-strong p-4 text-sm text-subtle">
             No source analysis has been run for this comparison yet. Analyze a ZIP archive or a
             GitHub repository to look for affected integrations.
           </div>
+        ) : null}
+
+        {snapshotsState === "ready" && snapshots.length > 0 && !active ? (
+          <p className="text-sm text-subtle">
+            Select a source analysis below to review its evidence.
+          </p>
         ) : null}
 
         {active ? (
